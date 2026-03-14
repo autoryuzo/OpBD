@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Инфраструктура брокера (только kafka + mosquitto).
 # Сервисы приложений (системы, компоненты) — в dummy_component/docker/, dummy_system/docker/.
 # name задаёт общий проект: при запуске из корня или из dummy_component используется один и тот же
@@ -78,3 +79,50 @@ networks:
   drones_net:
     driver: bridge
     name: ${DOCKER_NETWORK:-drones_net}
+=======
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: ordv_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ordv
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: ordv_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ad.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+  app:
+    build:
+      context: ..                    
+      dockerfile: docker/Dockerfile
+    container_name: ordv_app
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env                   
+    restart: always
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
+>>>>>>> f4bc74fa51ec6152202b00d57900eaa3d13cb466
