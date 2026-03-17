@@ -19,8 +19,11 @@ class ComponentTopics:
 
 class GatewayActions:
 
+    REGISTER_DRONE = "register_drone"
     REGISTER_MISSION = "register_mission"
     AUTHORIZE_MISSION = "authorize_mission"
     REQUEST_TAKEOFF = "request_takeoff"
-    FORCE_LAND = "force_land"
-    GET_REQUESTS = "get_requests"
+    REVOKE_TAKEOFF = "revoke_takeoff"
+    SEND_TELEMETRY = "send_telemetry"
+    UPDATE_NO_FLY_ZONE = "update_no_fly_zone"
+    GET_HISTORY = "get_history"

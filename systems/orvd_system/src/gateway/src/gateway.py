@@ -1,7 +1,7 @@
 """
-DummyGateway — координатор dummy_system.
+OrvdGateway - координатор orvd_system.
 
-Принимает запросы на топик systems.dummy_system и проксирует
+Принимает запросы на топик systems.orvd_system и проксирует
 к внутренним компонентам по таблице ACTION_ROUTING.
 Отправитель знает только систему и action, не компоненты.
 """
@@ -20,11 +20,14 @@ from systems.orvd_system.src.gateway.topics import (
 class OrvdGateway(BaseGateway):
 
     ACTION_ROUTING = {
+        GatewayActions.REGISTER_DRONE: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.REGISTER_MISSION: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.AUTHORIZE_MISSION: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.REQUEST_TAKEOFF: ComponentTopics.ORVD_COMPONENT,
-        GatewayActions.FORCE_LAND: ComponentTopics.ORVD_COMPONENT,
-        GatewayActions.GET_REQUESTS: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.REVOKE_TAKEOFF: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.SEND_TELEMETRY: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.UPDATE_NO_FLY_ZONE: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.GET_HISTORY: ComponentTopics.ORVD_COMPONENT,
     }
 
     PROXY_TIMEOUT = 10.0

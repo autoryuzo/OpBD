@@ -6,7 +6,7 @@ _P = f"{_NS}." if _NS else ""
 
 
 class ComponentTopics:
-    # Основной топик компонента ОрВД — все действия приходят сюда
+    # Основной топик компонента ОрВД - все действия приходят сюда
     ORVD_COMPONENT = f"{_P}components.orvd_component"
 
     @classmethod
@@ -24,6 +24,10 @@ class OrvdActions:
     REVOKE_TAKEOFF = "revoke_takeoff"        # отзыв разрешения на полёт
     SEND_TELEMETRY = "send_telemetry"        # отправка телеметрии
 
-    # ОрВД / система
+     # ОрВД / система
     AUTHORIZE_MISSION = "authorize_mission"  # авторизация миссии
     GET_HISTORY = "get_history"              # получение истории событий
+
+    # Зоны
+    ADD_NO_FLY_ZONE = "add_no_fly_zone"      # добавление бесполётной зоны
+    REMOVE_NO_FLY_ZONE = "remove_no_fly_zone" # удаление бесполётной зоны
