@@ -38,6 +38,3 @@ class GatewayActions:
     SEND_TELEMETRY = "send_telemetry"
     UPDATE_NO_FLY_ZONE = "update_no_fly_zone"
     GET_HISTORY = "get_history"
-
-    # 🔥 внешний контракт Agrodron
-    REQUEST_DEPARTURE = "request_departure"

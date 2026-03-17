@@ -1,12 +1,13 @@
 """
-OrvdGateway - внешний API ORVD.
+OrvdGateway - координатор orvd_system.
 
-Совместим с Agrodron API:
-Топик: v1.ORVD.ORVD001.main
-Action: request_departure
+Принимает:
+- внутренние запросы на systems.orvd_system
+- внешние запросы на v1.ORVD.ORVD001.main (Agrodron API)
+
+Проксирует к OrvdComponent.
 """
-
-from typing import Optional, Dict, Any
+from typing import Optional
 
 from sdk.base_gateway import BaseGateway
 from broker.system_bus import SystemBus
@@ -21,7 +22,6 @@ from systems.orvd_system.src.gateway.topics import (
 class OrvdGateway(BaseGateway):
 
     ACTION_ROUTING = {
-        # внутренние действия
         GatewayActions.REGISTER_DRONE: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.REGISTER_MISSION: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.AUTHORIZE_MISSION: ComponentTopics.ORVD_COMPONENT,
@@ -30,6 +30,7 @@ class OrvdGateway(BaseGateway):
         GatewayActions.SEND_TELEMETRY: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.UPDATE_NO_FLY_ZONE: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.GET_HISTORY: ComponentTopics.ORVD_COMPONENT,
+
     }
 
     PROXY_TIMEOUT = 10.0
@@ -43,62 +44,14 @@ class OrvdGateway(BaseGateway):
         super().__init__(
             system_id=system_id,
             system_type="orvd_system",
-            topic=SystemTopics.ORVD_EXTERNAL,  # слушаем внешний топик
+            topic=SystemTopics.ORVD_SYSTEM,
             bus=bus,
             health_port=health_port,
         )
 
-    # --------------------------------------------------------
-    # ВНЕШНИЙ КОНТРАКТ AGRODRON
-    # --------------------------------------------------------
+        # Подписка на внешний API топик
+        bus.subscribe(SystemTopics.ORVD_EXTERNAL, self._handle_message)
 
-    def _handle_request_departure(
-        self,
-        payload: Dict[str, Any],
-        sender: str,
-    ) -> Dict[str, Any]:
-        """
-        Обрабатывает request_departure от дрона.
-        Преобразует во внутренний request_takeoff.
-        """
-
-        mission_id = payload.get("mission_id")
-
-        if not mission_id:
-            return {"approved": False, "reason": "invalid_payload"}
-
-        # проксируем во внутренний компонент
-        internal_response = self.proxy_request(
-            topic=ComponentTopics.ORVD_COMPONENT,
-            action=GatewayActions.REQUEST_TAKEOFF,
-            payload={"mission_id": mission_id},
-            timeout=self.PROXY_TIMEOUT,
-        )
-
-        # Преобразуем формат ответа
-        if not internal_response:
-            return {"approved": False, "reason": "orvd_unavailable"}
-
-        status = internal_response.get("status")
-
-        if status == "takeoff_authorized":
-            return {"approved": True}
-
-        if status == "takeoff_denied":
-            return {
-                "approved": False,
-                "reason": internal_response.get("reason", "airspace_restricted"),
-            }
-
-        return {"approved": False, "reason": "unknown_error"}
-
-    # --------------------------------------------------------
-
-    def register_handlers(self):
-        super().register_handlers()
-
-        # регистрируем внешний action
-        self.register_handler(
-            GatewayActions.REQUEST_DEPARTURE,
-            self._handle_request_departure,
-        )
+        print(f"[ORVD] Gateway listening on:")
+        print(f"  - {SystemTopics.ORVD_SYSTEM}")
+        print(f"  - {SystemTopics.ORVD_EXTERNAL}")
