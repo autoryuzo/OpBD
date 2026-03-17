@@ -161,17 +161,28 @@ class OrvdComponent(BaseComponent):
 
     def _handle_request_takeoff(self, message: Dict[str, Any]) -> Dict[str, Any]:
         payload = message.get("payload", {})
-        drone_id = payload.get("drone_id")
         mission_id = payload.get("mission_id")
 
-        if drone_id not in self._drones:
-            return {"status": "error", "message": "drone not registered"}
+        if not mission_id:
+            return {"status": "error", "message": "mission_id required"}
+
+        if mission_id not in self._missions:
+            return {"status": "takeoff_denied", "reason": "mission not found"}
 
         if mission_id not in self._authorized:
-            return {"status": "denied", "reason": "mission not authorized"}
+            return {"status": "takeoff_denied", "reason": "mission not authorized"}
+
+        mission = self._missions[mission_id]
+        drone_id = mission.get("drone_id")
+
+        if not drone_id:
+            return {"status": "takeoff_denied", "reason": "drone not assigned"}
+
+        if drone_id not in self._drones:
+            return {"status": "takeoff_denied", "reason": "drone not registered"}
 
         if drone_id in self._active_flights:
-            return {"status": "error", "message": "drone already flying"}
+            return {"status": "takeoff_denied", "reason": "drone already flying"}
 
         self._active_flights[drone_id] = mission_id
         self._log("takeoff_authorized", drone_id=drone_id, mission_id=mission_id)

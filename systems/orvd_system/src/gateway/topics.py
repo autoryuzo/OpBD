@@ -1,4 +1,7 @@
-"""Топики и actions для Gateway orvd_system."""
+"""
+Топики и actions для Gateway orvd_system.
+Поддерживает внешний API Agrodron (v1.*).
+"""
 import os
 
 _NS = os.environ.get("SYSTEM_NAMESPACE", "")
@@ -6,7 +9,14 @@ _P = f"{_NS}." if _NS else ""
 
 
 class SystemTopics:
+    # Внутренний системный топик
     ORVD_SYSTEM = f"{_P}systems.orvd_system"
+
+    # ВНЕШНИЙ API топик (Agrodron контракт)
+    ORVD_EXTERNAL = os.environ.get(
+        "ORVD_EXTERNAL_TOPIC",
+        "v1.ORVD.ORVD001.main",
+    )
 
 
 class ComponentTopics:
@@ -19,6 +29,7 @@ class ComponentTopics:
 
 class GatewayActions:
 
+    # внутренние
     REGISTER_DRONE = "register_drone"
     REGISTER_MISSION = "register_mission"
     AUTHORIZE_MISSION = "authorize_mission"
@@ -27,3 +38,6 @@ class GatewayActions:
     SEND_TELEMETRY = "send_telemetry"
     UPDATE_NO_FLY_ZONE = "update_no_fly_zone"
     GET_HISTORY = "get_history"
+
+    # 🔥 внешний контракт Agrodron
+    REQUEST_DEPARTURE = "request_departure"
