@@ -220,22 +220,34 @@ Response:
 
 - Отправка телеметрии (дрон -> ОРВД)
 
-Action: `revoke_takeoff`
+Action: `send_telemetry`
 Payload:
 ```JSON
 {
-  "drone_id": "DRONE123"
+  "drone_id": "DRONE123",
+  "coords": {"lat": 55.7559, "lon": 37.6175},
+  "altitude": 120,
+  "speed": 10
 }
 ```
 Response:
+
+Если всё нормально:
 ```JSON
 {
-  "status": "landing_required",
-  "drone_id": "DRONE123",
+  "status": "telemetry_received",
   "from": "orvd_component"
 }
 ```
-
+Если дрон вошёл в запретную зону:
+```JSON
+{
+  "status": "emergency",
+  "command": "LAND",
+  "reason": "entered no_fly_zone",
+  "from": "orvd_component"
+}
+```
 - Добавление запретной зоны (ОРВД)
 
 Action: `add_no_fly_zone`
