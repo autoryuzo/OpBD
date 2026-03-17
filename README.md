@@ -99,6 +99,7 @@ docker compose -f .generated/docker-compose.yml --env-file .generated/.env logs 
 - Регистрация дрона (эксплуатант -> ОРВД)
 
 Action: `register_drone`
+
 Payload:
 ```JSON
 {
@@ -120,6 +121,7 @@ Response:
 - Регистрация миссии (эксплуатант -> ОРВД)
 
 Action: `register_mission`
+
 Payload:
 ```JSON
 {
@@ -155,6 +157,7 @@ Response:
 - Авторизация миссии (ОРВД)
 
 Action: `authorize_mission`
+
 Payload:
 ```JSON
 {
@@ -173,6 +176,7 @@ Response:
 - Запрос взлета (дрон -> ОРВД)
 
 Action: `request_takeoff`
+
 Payload:
 ```JSON
 {
@@ -203,6 +207,7 @@ Response:
 - Отзыв разрешения на взлёт (ОРВД -> дрон)
 
 Action: `revoke_takeoff`
+
 Payload:
 ```JSON
 {
@@ -221,6 +226,7 @@ Response:
 - Отправка телеметрии (дрон -> ОРВД)
 
 Action: `send_telemetry`
+
 Payload:
 ```JSON
 {
@@ -251,6 +257,7 @@ Response:
 - Добавление запретной зоны (ОРВД)
 
 Action: `add_no_fly_zone`
+
 Payload:
 ```JSON
 {
@@ -276,6 +283,7 @@ Response:
 - Удаление запретной зоны (ОРВД)
 
 Action: `remove_no_fly_zone`
+
 Payload:
 ```JSON
 {
@@ -293,6 +301,7 @@ Response:
 - Получение истории событий (ОРВД)
 
 Action: `get_history`
+
 Payload: {}
 
 Response:
