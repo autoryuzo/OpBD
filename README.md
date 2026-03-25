@@ -254,6 +254,83 @@ Response:
   "from": "orvd_component"
 }
 ```
+
+- Запрос телеметрии дрона (ОРВД -> дрон)
+
+Action: `request_telemetry`
+
+Payload:
+```JSON
+{
+  "drone_id": "DRONE123",
+  "drone_topic": "v1.Agrodron.Agrodron001.navigation"
+}
+```
+
+Response:
+
+Если телеметрия успешно получена и дрон в безопасной зоне:
+
+```JSON
+{
+  "status": "telemetry_ok",
+  "coords": {"lat":55.4434, "lon": 34.4223},
+  "from": "orvd_component"
+}
+```
+
+Если дрон вошел в запретную зону:
+
+```JSON
+- Отправка телеметрии (дрон -> ОРВД)
+
+Action: `send_telemetry`
+
+Payload:
+```JSON
+{
+  "drone_id": "DRONE123",
+  "coords": {"lat": 55.7559, "lon": 37.6175},
+  "altitude": 120,
+  "speed": 10
+}
+```
+Response:
+
+Если всё нормально:
+```JSON
+{
+  "status": "telemetry_received",
+  "from": "orvd_component"
+}
+```
+Если дрон вошёл в запретную зону:
+```JSON
+{
+  "status": "emergency",
+  "command": "LAND",
+  "reason": "entered no_fly_zone",
+  "from": "orvd_component"
+}
+```
+Если `drone_id` не указан:
+
+```JSON
+{
+  "status": "error",
+  "message": "drone_id required"
+}
+```
+
+Если телеметрия не получена в течение таймаута:
+
+```JSON
+{
+  "status": "error",
+  "message": "telemetry_timeout"
+}
+```
+
 - Добавление запретной зоны (ОРВД)
 
 Action: `add_no_fly_zone`
