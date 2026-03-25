@@ -41,7 +41,7 @@ def system_bus():
 
     bus = create_system_bus(client_id="test_client")
     bus.start()
-    time.sleep(2)
+    time.sleep(8)
     yield bus
     bus.stop()
 
