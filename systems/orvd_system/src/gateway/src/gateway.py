@@ -28,8 +28,10 @@ class OrvdGateway(BaseGateway):
         GatewayActions.REQUEST_TAKEOFF: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.REVOKE_TAKEOFF: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.SEND_TELEMETRY: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.REQUEST_TELEMETRY: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.UPDATE_NO_FLY_ZONE: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.GET_HISTORY: ComponentTopics.ORVD_COMPONENT,
+        
 
     }
 
@@ -49,7 +51,6 @@ class OrvdGateway(BaseGateway):
             health_port=health_port,
         )
 
-        # Подписка на внешний API топик
         bus.subscribe(SystemTopics.ORVD_EXTERNAL, self._handle_message)
 
         print(f"[ORVD] Gateway listening on:")

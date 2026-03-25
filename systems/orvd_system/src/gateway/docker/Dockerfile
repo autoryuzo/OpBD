@@ -14,4 +14,4 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "-m", "systems.dummy_system.src.gateway"]
+CMD ["python", "-m", "systems.orvd_system.src.gateway"]

@@ -10,6 +10,21 @@ from orvd_component.src.orvd_component import OrvdComponent
 def bus():
     return MagicMock()
 
+@pytest.fixture
+def bus():
+    bus = MagicMock()
+
+    # имитируем ответ дрона
+    bus.request.return_value = {
+        "payload": {
+            "lat": 60.0,
+            "lon": 30.0,
+            "alt_m": 5.0,
+            "gps_valid": True
+        }
+    }
+
+    return bus
 
 @pytest.fixture
 def component(bus):
@@ -173,6 +188,20 @@ def test_telemetry_zone_violation(component):
     print(f"[DEBUG] Telemetry emergency result: {result}")
     assert result["status"] == "emergency"
     assert result["command"] == "LAND"
+
+
+def test_request_telemetry_ok(component):
+    message = {
+        "action": "request_telemetry",
+        "payload": {
+            "drone_id": "drone_1",
+            "drone_topic": "v1.Agrodron.Agrodron001.navigation"
+        }
+    }
+
+    result = component._handle_request_telemetry(message)
+
+    assert result["status"] == "telemetry_ok"
 
 
 # ---------------------------------------------------------

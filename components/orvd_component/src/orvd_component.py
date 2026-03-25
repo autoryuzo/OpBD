@@ -61,6 +61,7 @@ class OrvdComponent(BaseComponent):
         self.register_handler("request_takeoff", self._handle_request_takeoff)
         self.register_handler("revoke_takeoff", self._handle_revoke_takeoff)
         self.register_handler("send_telemetry", self._handle_send_telemetry)
+        self.register_handler("request_telemetry", self._handle_request_telemetry)
         self.register_handler("get_history", self._handle_get_history)
 
         # зоны
@@ -161,17 +162,28 @@ class OrvdComponent(BaseComponent):
 
     def _handle_request_takeoff(self, message: Dict[str, Any]) -> Dict[str, Any]:
         payload = message.get("payload", {})
-        drone_id = payload.get("drone_id")
         mission_id = payload.get("mission_id")
 
-        if drone_id not in self._drones:
-            return {"status": "error", "message": "drone not registered"}
+        if not mission_id:
+            return {"status": "error", "message": "mission_id required"}
+
+        if mission_id not in self._missions:
+            return {"status": "takeoff_denied", "reason": "mission not found"}
 
         if mission_id not in self._authorized:
-            return {"status": "denied", "reason": "mission not authorized"}
+            return {"status": "takeoff_denied", "reason": "mission not authorized"}
+
+        mission = self._missions[mission_id]
+        drone_id = mission.get("drone_id")
+
+        if not drone_id:
+            return {"status": "takeoff_denied", "reason": "drone not assigned"}
+
+        if drone_id not in self._drones:
+            return {"status": "takeoff_denied", "reason": "drone not registered"}
 
         if drone_id in self._active_flights:
-            return {"status": "error", "message": "drone already flying"}
+            return {"status": "takeoff_denied", "reason": "drone already flying"}
 
         self._active_flights[drone_id] = mission_id
         self._log("takeoff_authorized", drone_id=drone_id, mission_id=mission_id)
@@ -227,6 +239,51 @@ class OrvdComponent(BaseComponent):
             }
 
         return {"status": "telemetry_received", "from": self.component_id}
+    
+    def _handle_request_telemetry(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload", {})
+        drone_id = payload.get("drone_id")
+
+        if not drone_id:
+            return {"status": "error", "message": "drone_id required"}
+
+        # Запрашиваем телеметрию у дрона
+        try:
+            response = self.bus.request(
+                topic=payload.get("drone_topic"),   # например v1.Agrodron.Agrodron001.navigation
+                message={
+                    "action": "get_nav_state",
+                    "sender": self.topic,
+                    "payload": {"drone_id": drone_id},
+                },
+                timeout=5.0,
+            )
+        except Exception:
+            return {"status": "error", "message": "telemetry_timeout"}
+
+        nav_payload = response.get("payload", {})
+        coords = {
+            "lat": nav_payload.get("lat"),
+            "lon": nav_payload.get("lon"),
+        }
+
+        self._telemetry[drone_id] = nav_payload
+
+        if self._point_in_no_fly_zone(coords):
+            self._log("zone_violation", drone_id=drone_id)
+
+            return {
+                "status": "emergency",
+                "command": "LAND",
+                "reason": "entered no_fly_zone",
+                "from": self.component_id,
+            }
+
+        return {
+            "status": "telemetry_ok",
+            "coords": coords,
+            "from": self.component_id,
+    }
 
     # ==========================================================
     # NO-FLY ZONES

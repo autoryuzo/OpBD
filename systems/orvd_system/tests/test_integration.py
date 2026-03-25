@@ -1,30 +1,24 @@
 """
-E2E тесты dummy_system через реальный брокер.
-Требует: make docker-up (kafka/mosquitto + dummy_component_a/b).
+E2E тесты ORVD системы через реальный брокер.
+Требует: make docker-up (Kafka/Mosquitto + ORVD gateway + ORVD component).
 Если контейнеры не запущены — тесты пропускаются (skip).
 """
+
 import pytest
 import os
 import time
 import socket
 
-from systems.dummy_system.src.dummy_component_a.topics import (
-    ComponentTopics,
-    DummyComponentActions,
-)
-from systems.dummy_system.src.gateway.topics import (
-    SystemTopics,
-    GatewayActions,
-)
+from systems.orvd_system.src.gateway.topics import SystemTopics, GatewayActions
+from systems.orvd_system.src.orvd_component.topics import ComponentTopics
 
 
 def _broker_available(retries=5, delay=2):
+    """Проверяем доступность брокера (Kafka/MQTT) перед запуском E2E."""
     bt = os.environ.get("BROKER_TYPE", "kafka").lower().strip().split("#")[0].strip()
     host = os.environ.get("BROKER_HOST", "localhost")
     port_val = (
-        os.environ.get("MQTT_PORT", "1883")
-        if bt == "mqtt"
-        else os.environ.get("KAFKA_PORT", "9092")
+        os.environ.get("MQTT_PORT", "1883") if bt == "mqtt" else os.environ.get("KAFKA_PORT", "9092")
     )
     port = int(port_val)
     for _ in range(retries):
@@ -45,170 +39,94 @@ def system_bus():
         )
     from broker.bus_factory import create_system_bus
 
-    bt = os.environ.get("BROKER_TYPE", "kafka").lower().strip().split("#")[0].strip()
-    host = os.environ.get("BROKER_HOST", "localhost")
-    kafka_port = os.environ.get("KAFKA_PORT", "9092")
-    mqtt_port = os.environ.get("MQTT_PORT", "1883")
-
-    if not os.environ.get("BROKER_USER") and os.environ.get("ADMIN_USER"):
-        os.environ["BROKER_USER"] = os.environ["ADMIN_USER"]
-    if not os.environ.get("BROKER_PASSWORD") and os.environ.get("ADMIN_PASSWORD"):
-        os.environ["BROKER_PASSWORD"] = os.environ["ADMIN_PASSWORD"]
-    if bt == "kafka":
-        os.environ["BROKER_TYPE"] = "kafka"
-        os.environ["KAFKA_BOOTSTRAP_SERVERS"] = os.environ.get(
-            "KAFKA_BOOTSTRAP_SERVERS", f"{host}:{kafka_port}"
-        )
-    else:
-        os.environ["BROKER_TYPE"] = "mqtt"
-        os.environ["MQTT_BROKER"] = os.environ.get("MQTT_BROKER", host)
-        os.environ["MQTT_PORT"] = str(mqtt_port)
-
     bus = create_system_bus(client_id="test_client")
     bus.start()
     time.sleep(2)
-
     yield bus
-
     bus.stop()
 
 
-def test_echo_component(system_bus):
-    """Отправляем echo в компонент и проверяем ответ."""
-    response = system_bus.request(
-        ComponentTopics.DUMMY_COMPONENT_A,
-        {
-            "action": DummyComponentActions.ECHO,
-            "sender": "test_client",
-            "payload": {"message": "hello"},
+# ==========================================================
+# COMPONENT TESTS
+# ==========================================================
+
+def test_register_drone_and_mission(system_bus):
+    """Регистрация дрона и миссии через gateway + компонент."""
+    drone_msg = {
+        "action": GatewayActions.REGISTER_DRONE,
+        "sender": SystemTopics.ORVD_SYSTEM,
+        "payload": {"drone_id": "DRONE_1"},
+    }
+    resp_drone = system_bus.request(ComponentTopics.ORVD_COMPONENT, drone_msg, timeout=10.0)
+    print("Register drone response:", resp_drone)
+    assert resp_drone["status"] == "registered"
+
+    mission_msg = {
+        "action": GatewayActions.REGISTER_MISSION,
+        "sender": SystemTopics.ORVD_SYSTEM,
+        "payload": {
+            "mission_id": "MISSION_1",
+            "drone_id": "DRONE_1",
+            "route": [{"lat": 60.0, "lon": 30.0}],
         },
-        timeout=10.0,
-    )
-    if response is None:
-        pytest.skip(
-            "No response from component (timeout). "
-            "Run: make docker-up"
-        )
-    assert response.get("success") is True
-    assert response["payload"]["echo"] == {"message": "hello"}
-    assert "from" in response["payload"]
+    }
+    resp_mission = system_bus.request(ComponentTopics.ORVD_COMPONENT, mission_msg, timeout=10.0)
+    print("Register mission response:", resp_mission)
+    assert resp_mission["status"] == "mission_registered"
 
 
-def test_increment_component(system_bus):
-    """Отправляем increment в компонент."""
-    response = system_bus.request(
-        ComponentTopics.DUMMY_COMPONENT_A,
-        {
-            "action": DummyComponentActions.INCREMENT,
-            "sender": "test_client",
-            "payload": {"value": 7},
-        },
-        timeout=10.0,
-    )
-    if response is None:
-        pytest.skip(
-            "No response from component (timeout). "
-            "Run: make docker-up"
-        )
-    assert response.get("success") is True
-    assert response["payload"]["counter"] == 7
-    assert "from" in response["payload"]
+def test_authorize_and_takeoff(system_bus):
+    """Авторизация миссии и запрос на взлет."""
+    # authorize mission
+    auth_msg = {
+        "action": GatewayActions.AUTHORIZE_MISSION,
+        "sender": SystemTopics.ORVD_SYSTEM,
+        "payload": {"mission_id": "MISSION_1"},
+    }
+    resp_auth = system_bus.request(ComponentTopics.ORVD_COMPONENT, auth_msg, timeout=10.0)
+    print("Authorize mission response:", resp_auth)
+    assert resp_auth["status"] == "authorized"
+
+    # request takeoff
+    takeoff_msg = {
+        "action": GatewayActions.REQUEST_TAKEOFF,
+        "sender": SystemTopics.ORVD_SYSTEM,
+        "payload": {"drone_id": "DRONE_1", "mission_id": "MISSION_1"},
+    }
+    resp_takeoff = system_bus.request(ComponentTopics.ORVD_COMPONENT, takeoff_msg, timeout=10.0)
+    print("Request takeoff response:", resp_takeoff)
+    assert resp_takeoff["status"] == "takeoff_authorized"
 
 
-def test_get_state_component(system_bus):
-    """Запрашиваем состояние компонента."""
-    response = system_bus.request(
-        ComponentTopics.DUMMY_COMPONENT_A,
-        {
-            "action": DummyComponentActions.GET_STATE,
-            "sender": "test_client",
-            "payload": {},
-        },
-        timeout=10.0,
-    )
-    if response is None:
-        pytest.skip(
-            "No response from component (timeout). "
-            "Run: make docker-up"
-        )
-    assert response.get("success") is True
-    assert "counter" in response["payload"]
-    assert "from" in response["payload"]
+def test_get_history(system_bus):
+    """Проверяем историю событий компонента."""
+    history_msg = {
+        "action": GatewayActions.GET_HISTORY,
+        "sender": SystemTopics.ORVD_SYSTEM,
+        "payload": {},
+    }
+    resp_history = system_bus.request(ComponentTopics.ORVD_COMPONENT, history_msg, timeout=10.0)
+    print("Component history:", resp_history)
+    assert "history" in resp_history
+    # убеждаемся, что есть события регистрации дрона и миссии
+    events = [e["event"] for e in resp_history["history"]]
+    assert "drone_registered" in events
+    assert "mission_registered" in events
+    assert "mission_authorized" in events
+    assert "takeoff_authorized" in events
 
 
-def test_component_a_asks_b(system_bus):
-    """A отправляет запрос в B, B обрабатывает и отвечает, A возвращает ответ тесту."""
-    response = None
-    for attempt in range(3):
-        response = system_bus.request(
-            ComponentTopics.DUMMY_COMPONENT_A,
-            {
-                "action": DummyComponentActions.ASK_B,
-                "sender": "test_client",
-                "payload": {"query": "hello"},
-            },
-            timeout=15.0,
-        )
-        if response is not None:
-            break
-        time.sleep(5)
-    if response is None:
-        pytest.skip(
-            "No response from component (timeout). "
-            "Run: make docker-up"
-        )
-    assert response.get("success") is True
-    assert "b_response" in response["payload"]
-    assert response["payload"]["b_response"]["data"] == "response_for_hello"
-    assert response["payload"]["b_response"]["source"] == "dummy_component_b"
-    assert response["payload"]["relayed_by"] == "dummy_component_a"
+# ==========================================================
+# Gateway integration test
+# ==========================================================
 
-
-# --- Gateway integration tests ---
-
-
-def test_gateway_echo(system_bus):
-    """Отправляем echo через gateway (systems.dummy_system) — не напрямую в компонент."""
-    response = system_bus.request(
-        SystemTopics.DUMMY_SYSTEM,
-        {
-            "action": GatewayActions.ECHO,
-            "sender": "test_client",
-            "payload": {"message": "hello_via_gateway"},
-        },
-        timeout=15.0,
-    )
-    if response is None:
-        pytest.skip(
-            "No response from gateway (timeout). "
-            "Run: make docker-up"
-        )
-    assert response.get("success") is True
-    assert response["payload"]["echo"] == {"message": "hello_via_gateway"}
-    assert "from" in response["payload"]
-
-
-def test_gateway_get_data(system_bus):
-    """Отправляем get_data через gateway — он проксирует в компонент B."""
-    response = None
-    for attempt in range(3):
-        response = system_bus.request(
-            SystemTopics.DUMMY_SYSTEM,
-            {
-                "action": GatewayActions.GET_DATA,
-                "sender": "test_client",
-                "payload": {"query": "gw_test"},
-            },
-            timeout=15.0,
-        )
-        if response is not None:
-            break
-        time.sleep(5)
-    if response is None:
-        pytest.skip(
-            "No response from gateway (timeout). "
-            "Run: make docker-up"
-        )
-    assert response.get("success") is True
-    assert response["payload"]["data"] == "response_for_gw_test"
-    assert response["payload"]["source"] == "dummy_component_b"
+def test_gateway_register_drone(system_bus):
+    """Отправка REGISTER_DRONE через gateway."""
+    msg = {
+        "action": GatewayActions.REGISTER_DRONE,
+        "sender": "test_client",
+        "payload": {"drone_id": "DRONE_2"},
+    }
+    resp = system_bus.request(SystemTopics.ORVD_SYSTEM, msg, timeout=10.0)
+    print("Gateway register drone response:", resp)
+    assert resp["status"] == "registered"

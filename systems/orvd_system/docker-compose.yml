@@ -6,7 +6,7 @@ services:
   orvd_component:
     build:
       context: ../..
-      dockerfile: systems/orvd_system/src/orvd_component_a/docker/Dockerfile
+      dockerfile: systems/orvd_system/src/orvd_component/docker/Dockerfile
     profiles: ["kafka", "mqtt"]
     environment:
       - COMPONENT_ID=orvd_component

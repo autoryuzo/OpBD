@@ -23,6 +23,7 @@ class OrvdActions:
     REQUEST_TAKEOFF = "request_takeoff"      # запрос на взлёт
     REVOKE_TAKEOFF = "revoke_takeoff"        # отзыв разрешения на полёт
     SEND_TELEMETRY = "send_telemetry"        # отправка телеметрии
+    REQUEST_TELEMETRY = "request_telemetry"  # запрос телеметрии
 
      # ОрВД / система
     AUTHORIZE_MISSION = "authorize_mission"  # авторизация миссии
