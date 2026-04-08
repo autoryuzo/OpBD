@@ -45,10 +45,6 @@ def system_bus():
     yield bus
     bus.stop()
 
-def _handle_message(self, message):
-    print(" RECEIVED:", message)
-    return super()._handle_message(message)
-
 
 # ==========================================================
 # COMPONENT TESTS
