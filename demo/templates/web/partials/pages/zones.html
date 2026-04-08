@@ -1,0 +1,26 @@
+<section class="page" id="zones_page">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">Бесполетные зоны</div>
+    </div>
+    <div class="panel-body">
+      <div id="zones_list"></div>
+
+      <h4>Добавить зону</h4>
+      <input type="text" id="new_zone_name" placeholder="Название зоны">
+      <select id="new_zone_type">
+        <option value="no-fly">Запретная</option>
+        <option value="local">Локальная "ковер"</option>
+      </select>
+      <button id="add_zone_btn">Добавить зону</button>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("add_zone_btn").addEventListener("click", () => {
+      const name = document.getElementById("new_zone_name").value.trim();
+      const type = document.getElementById("new_zone_type").value;
+      if (name) WebUI.zones.addZone({ id: Date.now(), name, type, coords: [] });
+    });
+  </script>
+</section>

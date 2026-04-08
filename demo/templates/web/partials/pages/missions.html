@@ -1,0 +1,23 @@
+<section class="page active" id="missions_page">
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">Миссии</div>
+    </div>
+    <div class="panel-body">
+      <div id="missions_list"></div>
+
+      <h4>Добавить миссию</h4>
+      <input type="text" id="new_mission_id" placeholder="ID миссии">
+      <input type="text" id="new_mission_drone" placeholder="ID дрона">
+      <button id="add_mission_btn">Добавить миссию</button>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("add_mission_btn").addEventListener("click", () => {
+      const id = document.getElementById("new_mission_id").value.trim();
+      const drone = document.getElementById("new_mission_drone").value.trim();
+      if (id) WebUI.missions.addMission({ id, drone_id: drone });
+    });
+  </script>
+</section>
