@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Управление БВС</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='web/css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='web/css/nus.css') }}">
+</head>
+<body>
+  <div class="shell" id="shell">
+    {% include "web/partials/sidebar.html" %}
+
+    <div class="shell-main">
+      <header class="content-bar">
+        <div class="content-bar-left">
+          <button class="sidebar-toggle" id="sidebar_toggle" type="button">
+            <span></span><span></span><span></span>
+          </button>
+          <div>
+            <div class="content-title" id="current_page_title">Миссии</div>
+          </div>
+        </div>
+      </header>
+
+      <main class="app">
+        {% include "web/partials/pages/missions.html" %}
+        {% include "web/partials/pages/drones.html" %}
+        {% include "web/partials/pages/zones.html" %}
+        {% include "web/partials/pages/map.html" %}
+      </main>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='web/js/system.js') }}"></script>
+  <script src="{{ url_for('static', filename='web/js/missions.js') }}"></script>
+  <script src="{{ url_for('static', filename='web/js/drones.js') }}"></script>
+  <script src="{{ url_for('static', filename='web/js/zones.js') }}"></script>
+  <script src="{{ url_for('static', filename='web/js/map.js') }}"></script>
+</body>
+</html>
