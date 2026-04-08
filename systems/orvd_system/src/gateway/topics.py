@@ -37,5 +37,6 @@ class GatewayActions:
     REVOKE_TAKEOFF = "revoke_takeoff"
     SEND_TELEMETRY = "send_telemetry"
     REQUEST_TELEMETRY = "request_telemetry"
-    UPDATE_NO_FLY_ZONE = "update_no_fly_zone"
+    ADD_NO_FLY_ZONE = "add_no_fly_zone"
+    REMOVE_NO_FLY_ZONE = "remove_no_fly_zone"
     GET_HISTORY = "get_history"

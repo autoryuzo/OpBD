@@ -1,7 +1,8 @@
 .PHONY: help prepare unit-test test-all-docker tests docker-up docker-down docker-logs
 
-PIPENV_PIPFILE = ../../config/Pipfile
-PYTEST_CONFIG = ../../config/pyproject.toml
+PROJECT_ROOT ?= ../..
+PIPENV_PIPFILE = $(PROJECT_ROOT)/config/Pipfile
+PYTEST_CONFIG = $(PROJECT_ROOT)/config/pyproject.toml
 GENERATED = .generated
 DOCKER_COMPOSE = docker compose -f $(GENERATED)/docker-compose.yml --env-file $(GENERATED)/.env
 
@@ -15,7 +16,7 @@ help:
 	@echo "make tests             - Все тесты"
 
 prepare:
-	@cd ../.. && PIPENV_PIPFILE=config/Pipfile pipenv run python scripts/prepare_system.py systems/orvd_system
+	@cd $(PROJECT_ROOT) && PIPENV_PIPFILE=config/Pipfile pipenv run python scripts/prepare_system.py systems/orvd_system
 
 docker-up: prepare
 	@set -a && . $(GENERATED)/.env && set +a && \
