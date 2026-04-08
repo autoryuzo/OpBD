@@ -29,7 +29,8 @@ class OrvdGateway(BaseGateway):
         GatewayActions.REVOKE_TAKEOFF: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.SEND_TELEMETRY: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.REQUEST_TELEMETRY: ComponentTopics.ORVD_COMPONENT,
-        GatewayActions.UPDATE_NO_FLY_ZONE: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.ADD_NO_FLY_ZONE: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.REMOVE_NO_FLY_ZONE: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.GET_HISTORY: ComponentTopics.ORVD_COMPONENT,
         
 

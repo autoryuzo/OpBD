@@ -14,6 +14,10 @@ class ComponentTopics:
         return [cls.ORVD_COMPONENT]
 
 
+class ExternalTopics:
+    REGULATOR = f"{_P}systems.regulator"
+
+
 class OrvdActions:
     # Эксплуатант
     REGISTER_DRONE = "register_drone"        # регистрирует дрона
