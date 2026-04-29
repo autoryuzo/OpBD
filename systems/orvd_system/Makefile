@@ -5,14 +5,21 @@ PYTEST_CONFIG = ../../config/pyproject.toml
 GENERATED = .generated
 DOCKER_COMPOSE = docker compose -f $(GENERATED)/docker-compose.yml --env-file $(GENERATED)/.env
 
+PYTEST = PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG)
+
 help:
 	@echo "make prepare           - Собрать docker-compose + .env из компонентов"
 	@echo "make docker-up         - Запустить систему (prepare + docker compose up)"
 	@echo "make docker-down       - Остановить систему"
 	@echo "make docker-logs       - Логи"
-	@echo "make unit-test         - Unit тесты компонентов"
-	@echo "make test-all-docker   - Интеграционные тесты c использованием docker (docker required)"
+	@echo "make unit-test         - Unit тесты"
+	@echo "make integration-test  - Интеграционные тесты (без docker)"
+	@echo "make docker-test       - Интеграционные тесты (docker)"
 	@echo "make tests             - Все тесты"
+
+# ---------------------------------------------------------------------------
+# DOCKER
+# ---------------------------------------------------------------------------
 
 prepare:
 	@cd ../.. && PIPENV_PIPFILE=config/Pipfile pipenv run python scripts/prepare_system.py systems/orvd_system
@@ -38,14 +45,18 @@ docker-logs:
 		[ "$${ENABLE_FABRIC:-false}" = "true" ] && profiles="$$profiles --profile fabric"; \
 		$(DOCKER_COMPOSE) $$profiles logs -f
 
+# ---------------------------------------------------------------------------
+# TESTS
+# ---------------------------------------------------------------------------
+
 unit-test:
-	@PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG) tests/test_orvd_unit.py -v
+	@echo "=== Unit тесты ==="
+	@$(PYTEST) tests/unit/ -v --tb=short
 
-test-all-docker: docker-up
-	@echo "Waiting for broker and components..."
-	@sleep 45
-	@set -a && . $(GENERATED)/.env && set +a && \
-		PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG) tests/test_integration.py -v
-	-$(MAKE) docker-down
+integration-test:
+	@echo "=== Интеграционные тесты (in-process) ==="
+	@$(PYTEST) tests/integration/ -v --tb=short
 
-tests: unit-test test-all-docker
+tests: unit-test integration-test
+	@echo ""
+	@echo "Все тесты пройдены."
