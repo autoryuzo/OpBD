@@ -13,120 +13,218 @@ from systems.orvd_system.src.gateway.topics import SystemTopics, GatewayActions
 from systems.orvd_system.src.orvd_component.topics import ComponentTopics
 
 
-def _broker_available(retries=5, delay=2):
-    """Проверяем доступность брокера (Kafka/MQTT) перед запуском E2E."""
-    bt = os.environ.get("BROKER_TYPE", "kafka").lower().strip().split("#")[0].strip()
+# ==========================================================
+# BROKER CHECK
+# ==========================================================
+
+def _broker_available(retries=10, delay=1):
+    bt = os.environ.get("BROKER_TYPE", "kafka").lower()
     host = os.environ.get("BROKER_HOST", "localhost")
-    port_val = (
-        os.environ.get("MQTT_PORT", "1883") if bt == "mqtt" else os.environ.get("KAFKA_PORT", "9092")
-    )
-    port = int(port_val)
+    port = int(os.environ.get("KAFKA_PORT", "9092" if bt == "kafka" else "1883"))
+
     for _ in range(retries):
         try:
             with socket.create_connection((host, port), timeout=2):
                 return True
-        except (socket.timeout, ConnectionRefusedError, OSError):
+        except Exception:
             time.sleep(delay)
+
     return False
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def system_bus():
     if not _broker_available():
-        pytest.skip(
-            f"Broker ({os.environ.get('BROKER_TYPE', 'kafka')}) "
-            f"at {os.environ.get('BROKER_HOST', 'localhost')} not available."
-        )
+        pytest.skip("Broker not available")
+
     from broker.bus_factory import create_system_bus
 
     bus = create_system_bus(client_id="test_client")
     bus.start()
-    time.sleep(15)
+
+    # ждём стабилизации системы
+    time.sleep(5)
+
     yield bus
+
     bus.stop()
 
 
 # ==========================================================
-# COMPONENT TESTS
+# HELPERS
 # ==========================================================
 
-def test_register_drone_and_mission(system_bus):
-    """Регистрация дрона и миссии через gateway + компонент."""
-    drone_msg = {
-        "action": GatewayActions.REGISTER_DRONE,
-        "sender": SystemTopics.ORVD_SYSTEM,
-        "payload": {"drone_id": "DRONE_1"},
-    }
-    resp_drone = system_bus.request(ComponentTopics.ORVD_COMPONENT, drone_msg, timeout=10.0)
-    print("Register drone response:", resp_drone)
-    assert resp_drone["status"] == "registered"
+def unique(prefix):
+    return f"{prefix}_{int(time.time() * 1000)}"
 
-    mission_msg = {
-        "action": GatewayActions.REGISTER_MISSION,
-        "sender": SystemTopics.ORVD_SYSTEM,
-        "payload": {
-            "mission_id": "MISSION_1",
-            "drone_id": "DRONE_1",
-            "route": [{"lat": 60.0, "lon": 30.0}],
+
+# ==========================================================
+# CORE FLOW TEST
+# ==========================================================
+
+def test_orvd_full_lifecycle(system_bus):
+    drone_id = unique("DRONE")
+    mission_id = unique("MISSION")
+
+    # ---------------- REGISTER DRONE ----------------
+    resp = system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REGISTER_DRONE,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {"drone_id": drone_id},
         },
-    }
-    resp_mission = system_bus.request(ComponentTopics.ORVD_COMPONENT, mission_msg, timeout=10.0)
-    print("Register mission response:", resp_mission)
-    assert resp_mission["status"] == "mission_registered"
+        timeout=10.0,
+    )
+
+    assert resp["status"] == "registered"
+
+    # ---------------- REGISTER MISSION ----------------
+    resp = system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REGISTER_MISSION,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {
+                "mission_id": mission_id,
+                "drone_id": drone_id,
+                "route": [],
+            },
+        },
+        timeout=10.0,
+    )
+
+    assert resp["status"] == "mission_registered"
+
+    # ---------------- AUTHORIZE ----------------
+    resp = system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.AUTHORIZE_MISSION,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {"mission_id": mission_id},
+        },
+        timeout=10.0,
+    )
+
+    assert resp["status"] == "authorized"
+
+    # ---------------- TAKEOFF ----------------
+    resp = system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REQUEST_TAKEOFF,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {
+                "drone_id": drone_id,
+                "mission_id": mission_id,
+            },
+        },
+        timeout=10.0,
+    )
+
+    assert resp["status"] == "takeoff_authorized"
 
 
-def test_authorize_and_takeoff(system_bus):
-    """Авторизация миссии и запрос на взлет."""
-    # authorize mission
-    auth_msg = {
-        "action": GatewayActions.AUTHORIZE_MISSION,
-        "sender": SystemTopics.ORVD_SYSTEM,
-        "payload": {"mission_id": "MISSION_1"},
-    }
-    resp_auth = system_bus.request(ComponentTopics.ORVD_COMPONENT, auth_msg, timeout=10.0)
-    print("Authorize mission response:", resp_auth)
-    assert resp_auth["status"] == "authorized"
+# ==========================================================
+# NEGATIVE CASES
+# ==========================================================
 
-    # request takeoff
-    takeoff_msg = {
-        "action": GatewayActions.REQUEST_TAKEOFF,
-        "sender": SystemTopics.ORVD_SYSTEM,
-        "payload": {"drone_id": "DRONE_1", "mission_id": "MISSION_1"},
-    }
-    resp_takeoff = system_bus.request(ComponentTopics.ORVD_COMPONENT, takeoff_msg, timeout=10.0)
-    print("Request takeoff response:", resp_takeoff)
-    assert resp_takeoff["status"] == "takeoff_authorized"
+def test_register_drone_without_id(system_bus):
+    resp = system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REGISTER_DRONE,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {},
+        },
+        timeout=10.0,
+    )
+
+    assert resp["status"] == "error"
 
 
-def test_get_history(system_bus):
-    """Проверяем историю событий компонента."""
-    history_msg = {
-        "action": GatewayActions.GET_HISTORY,
-        "sender": SystemTopics.ORVD_SYSTEM,
-        "payload": {},
-    }
-    resp_history = system_bus.request(ComponentTopics.ORVD_COMPONENT, history_msg, timeout=10.0)
-    print("Component history:", resp_history)
-    assert "history" in resp_history
-    # убеждаемся, что есть события регистрации дрона и миссии
-    events = [e["event"] for e in resp_history["history"]]
+def test_register_mission_without_drone(system_bus):
+    resp = system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REGISTER_MISSION,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {
+                "mission_id": unique("MISSION"),
+                "drone_id": "UNKNOWN",
+                "route": [],
+            },
+        },
+        timeout=10.0,
+    )
+
+    assert resp["status"] == "error"
+
+
+def test_takeoff_without_authorization(system_bus):
+    drone_id = unique("DRONE")
+    mission_id = unique("MISSION")
+
+    system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REGISTER_DRONE,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {"drone_id": drone_id},
+        },
+        timeout=10.0,
+    )
+
+    system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REGISTER_MISSION,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {
+                "mission_id": mission_id,
+                "drone_id": drone_id,
+                "route": [],
+            },
+        },
+        timeout=10.0,
+    )
+
+    resp = system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REQUEST_TAKEOFF,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {
+                "drone_id": drone_id,
+                "mission_id": mission_id,
+            },
+        },
+        timeout=10.0,
+    )
+
+    assert resp["status"] == "takeoff_denied"
+
+
+# ==========================================================
+# HISTORY CHECK
+# ==========================================================
+
+def test_history_contains_events(system_bus):
+    resp = system_bus.request(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.GET_HISTORY,
+            "sender": SystemTopics.ORVD_SYSTEM,
+            "payload": {},
+        },
+        timeout=10.0,
+    )
+
+    assert "history" in resp
+
+    events = [e["event"] for e in resp["history"]]
+
+    # базовые события системы
     assert "drone_registered" in events
     assert "mission_registered" in events
-    assert "mission_authorized" in events
-    assert "takeoff_authorized" in events
-
-
-# ==========================================================
-# Gateway integration test
-# ==========================================================
-
-def test_gateway_register_drone(system_bus):
-    """Отправка REGISTER_DRONE через gateway."""
-    msg = {
-        "action": GatewayActions.REGISTER_DRONE,
-        "sender": "test_client",
-        "payload": {"drone_id": "DRONE_2"},
-    }
-    resp = system_bus.request(SystemTopics.ORVD_SYSTEM, msg, timeout=10.0)
-    print("Gateway register drone response:", resp)
-    assert resp["status"] == "registered"

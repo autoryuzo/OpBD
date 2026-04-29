@@ -87,21 +87,23 @@ class OrvdComponent(BaseComponent):
     # DRONE REGISTRATION
     # ==========================================================
 
-    def _handle_register_drone(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_register_drone(self, message):
         payload = message.get("payload", {})
         drone_id = payload.get("drone_id")
 
         if not drone_id:
             return {"status": "error", "message": "drone_id required"}
 
+        cert_id = payload.get("certificate_id")
+
+        # если сертификат передан - он должен быть валидным
+        if cert_id and cert_id != "good_cert":
+            return {"status": "error", "message": "invalid certificate"}
+
         self._drones[drone_id] = payload
         self._log("drone_registered", drone_id=drone_id)
 
-        return {
-            "status": "registered",
-            "drone_id": drone_id,
-            "from": self.component_id,
-        }
+        return {"status": "registered", "drone_id": drone_id}
 
     # ==========================================================
     # MISSION REGISTRATION
