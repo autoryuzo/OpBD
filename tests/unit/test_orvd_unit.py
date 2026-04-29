@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
 
-from systems.orvd_system.src.gateway.src.gateway import OrvdGateway
-from systems.orvd_system.src.orvd_component.src.orvd_component import OrvdComponent
-from systems.orvd_system.src.gateway.topics import ComponentTopics, GatewayActions
+from src.gateway.src.gateway import OrvdGateway
+from src.orvd_component import OrvdComponent
+from src.gateway.topics import ComponentTopics, GatewayActions
 
 
 # ==========================================================
@@ -89,7 +89,234 @@ def test_authorize_and_takeoff_flow(component_and_bus):
 
     assert result["status"] == "takeoff_authorized"
 
-    # ==========================================================
+# register_drone (ошибки + сертификат)
+
+def test_register_drone_without_id(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_register_drone({"payload": {}})
+
+    assert result["status"] == "error"
+
+
+def test_register_drone_with_invalid_cert(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_register_drone({
+        "payload": {"drone_id": "D1", "certificate_id": "bad_cert"}
+    })
+
+    assert result["status"] == "error"
+    assert "invalid certificate" in result.get("message", "")
+
+
+def test_register_drone_with_valid_cert(component_and_bus):
+    component, bus = component_and_bus
+
+    bus.request.return_value = {"success": True, "payload": {"valid": True}}
+
+    result = component._handle_register_drone({
+        "payload": {"drone_id": "D1", "certificate_id": "good_cert"}
+    })
+
+    assert result["status"] == "registered"
+
+# mission + зоны
+
+def test_mission_rejected_by_zone(component_and_bus):
+    component, _ = component_and_bus
+
+    component._no_fly_zones["Z1"] = {
+        "active": True,
+        "bounds": {"min_lat": 0, "max_lat": 100, "min_lon": 0, "max_lon": 100}
+    }
+
+    component._handle_register_drone({"payload": {"drone_id": "D1"}})
+
+    result = component._handle_register_mission({
+        "payload": {
+            "mission_id": "M1",
+            "drone_id": "D1",
+            "route": [{"lat": 50, "lon": 50}]
+        }
+    })
+
+    assert result["status"] == "rejected"
+
+# authorize_mission
+
+def test_authorize_missing_mission(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_authorize_mission({
+        "payload": {"mission_id": "UNKNOWN"}
+    })
+
+    assert result["status"] == "error"
+
+# request_takeoff
+
+def test_takeoff_no_mission_id(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_request_takeoff({"payload": {}})
+    assert result["status"] == "error"
+
+
+def test_takeoff_mission_not_found(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_request_takeoff({
+        "payload": {"mission_id": "M1"}
+    })
+
+    assert result["status"] == "takeoff_denied"
+
+
+def test_takeoff_not_authorized(component_and_bus):
+    component, _ = component_and_bus
+
+    component._missions["M1"] = {"drone_id": "D1"}
+
+    result = component._handle_request_takeoff({
+        "payload": {"mission_id": "M1"}
+    })
+
+    assert result["status"] == "takeoff_denied"
+
+
+def test_takeoff_drone_not_registered(component_and_bus):
+    component, _ = component_and_bus
+
+    component._missions["M1"] = {"drone_id": "D1"}
+    component._authorized.add("M1")
+
+    result = component._handle_request_takeoff({
+        "payload": {"mission_id": "M1"}
+    })
+
+    assert result["status"] == "takeoff_denied"
+
+
+def test_takeoff_already_flying(component_and_bus):
+    component, _ = component_and_bus
+
+    component._drones["D1"] = {}
+    component._missions["M1"] = {"drone_id": "D1"}
+    component._authorized.add("M1")
+    component._active_flights["D1"] = "M1"
+
+    result = component._handle_request_takeoff({
+        "payload": {"mission_id": "M1"}
+    })
+
+    assert result["status"] == "takeoff_denied"
+
+# revoke_takeoff
+
+def test_revoke_not_active(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_revoke_takeoff({
+        "payload": {"drone_id": "D1"}
+    })
+
+    assert result["status"] == "error"
+
+# telemetry
+
+def test_telemetry_without_drone_id(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_send_telemetry({"payload": {}})
+    assert result["status"] == "error"
+
+
+def test_telemetry_zone_violation(component_and_bus):
+    component, _ = component_and_bus
+
+    component._no_fly_zones["Z1"] = {
+        "active": True,
+        "bounds": {"min_lat": 0, "max_lat": 100, "min_lon": 0, "max_lon": 100}
+    }
+
+    result = component._handle_send_telemetry({
+        "payload": {
+            "drone_id": "D1",
+            "coords": {"lat": 50, "lon": 50}
+        }
+    })
+
+    assert result["status"] == "emergency"
+
+# request_telemetry
+
+def test_request_telemetry_timeout(component_and_bus):
+    component, bus = component_and_bus
+
+    bus.request.side_effect = Exception()
+
+    result = component._handle_request_telemetry({
+        "payload": {"drone_id": "D1", "drone_topic": "test"}
+    })
+
+    assert result["status"] == "error"
+
+
+def test_request_telemetry_ok(component_and_bus):
+    component, bus = component_and_bus
+
+    bus.request.return_value = {
+        "payload": {"lat": 1, "lon": 1}
+    }
+
+    result = component._handle_request_telemetry({
+        "payload": {"drone_id": "D1", "drone_topic": "test"}
+    })
+
+    assert result["status"] == "telemetry_ok"
+
+# Зоны
+
+def test_add_zone_without_id(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_add_zone({"payload": {}})
+    assert result["status"] == "error"
+
+
+def test_remove_zone(component_and_bus):
+    component, _ = component_and_bus
+
+    component._no_fly_zones["Z1"] = {}
+
+    result = component._handle_remove_zone({
+        "payload": {"zone_id": "Z1"}
+    })
+
+    assert result["status"] == "zone_removed"
+
+def test_point_not_in_zone(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._point_in_no_fly_zone({"lat": 10, "lon": 10})
+
+    assert result is False
+
+
+def test_route_violation(component_and_bus):
+    component, _ = component_and_bus
+
+    component._no_fly_zones["Z1"] = {
+        "active": True,
+        "bounds": {"min_lat": 0, "max_lat": 100, "min_lon": 0, "max_lon": 100}
+    }
+
+    result = component._route_violates_zone([{"lat": 50, "lon": 50}])
+
+    assert result is True
+
+# ==========================================================
 # GATEWAY TESTS
 # ==========================================================
 
