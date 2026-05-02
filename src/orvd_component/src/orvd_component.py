@@ -18,6 +18,7 @@ from datetime import datetime
 from sdk.base_component import BaseComponent
 from broker.system_bus import SystemBus
 
+from systems.orvd_system.src.orvd_component.topics import ExternalTopics
 
 class OrvdComponent(BaseComponent):
 
@@ -137,7 +138,6 @@ class OrvdComponent(BaseComponent):
             "mission_id": mission_id,
             "from": self.component_id,
         }
-
     # ==========================================================
     # AUTHORIZE MISSION
     # ==========================================================
