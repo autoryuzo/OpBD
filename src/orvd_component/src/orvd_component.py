@@ -88,23 +88,35 @@ class OrvdComponent(BaseComponent):
     # DRONE REGISTRATION
     # ==========================================================
 
-    def _handle_register_drone(self, message):
+    def _handle_register_drone(self, message: Dict[str, Any]) -> Dict[str, Any]:
         payload = message.get("payload", {})
         drone_id = payload.get("drone_id")
 
         if not drone_id:
             return {"status": "error", "message": "drone_id required"}
 
-        cert_id = payload.get("certificate_id")
-
-        # если сертификат передан - он должен быть валидным
-        if cert_id and cert_id != "good_cert":
-            return {"status": "error", "message": "invalid certificate"}
+        cert_id = str(payload.get("certificate_id", "")).strip()
+        if cert_id:
+            v = self.bus.request(
+                ExternalTopics.REGULATOR,
+                {
+                    "action": "verify_drone_cert",
+                    "sender": self.component_id,
+                    "payload": {"drone_id": drone_id, "certificate_id": cert_id},
+                },
+                timeout=self.EXTERNAL_REQUEST_TIMEOUT,
+            )
+            if not v or not v.get("success") or not (v.get("payload") or {}).get("valid"):
+                return {"status": "error", "message": "regulator rejected drone certificate"}
 
         self._drones[drone_id] = payload
         self._log("drone_registered", drone_id=drone_id)
 
-        return {"status": "registered", "drone_id": drone_id}
+        return {
+            "status": "registered",
+            "drone_id": drone_id,
+            "from": self.component_id,
+        }
 
     # ==========================================================
     # MISSION REGISTRATION
