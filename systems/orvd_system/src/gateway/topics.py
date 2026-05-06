@@ -21,10 +21,11 @@ class SystemTopics:
 
 class ComponentTopics:
     ORVD_COMPONENT = f"{_P}components.orvd_component"
+    NOFLYZONES_COMPONENT = f"{_P}components.noflyzones_component"
 
     @classmethod
     def all(cls) -> list:
-        return [cls.ORVD_COMPONENT]
+        return [cls.ORVD_COMPONENT, cls.NOFLYZONES_COMPONENT]
 
 
 class GatewayActions:
@@ -37,5 +38,12 @@ class GatewayActions:
     REVOKE_TAKEOFF = "revoke_takeoff"
     SEND_TELEMETRY = "send_telemetry"
     REQUEST_TELEMETRY = "request_telemetry"
+    ADD_NO_FLY_ZONE = "add_no_fly_zone"
     UPDATE_NO_FLY_ZONE = "update_no_fly_zone"
+    REMOVE_NO_FLY_ZONE = "remove_no_fly_zone"
+    GET_NO_FLY_ZONES = "get_no_fly_zones"
+    CHECK_NO_FLY_POINT = "check_no_fly_point"
+    CHECK_NO_FLY_ROUTE = "check_no_fly_route"
+    ACTIVATE_CARPET_MODE = "activate_carpet_mode"
+    DEACTIVATE_CARPET_MODE = "deactivate_carpet_mode"
     GET_HISTORY = "get_history"

@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
 
-from systems.orvd_system.src.gateway.src.gateway import OrvdGateway
-from components.orvd_component.src.orvd_component import OrvdComponent
-from systems.orvd_system.src.gateway.topics import ComponentTopics, GatewayActions
+from src.gateway.src.gateway import OrvdGateway
+from src.orvd_component import OrvdComponent
+from src.gateway.topics import ComponentTopics, GatewayActions
 
 
 # ==========================================================
@@ -377,6 +377,32 @@ def test_gateway_timeout_returns_error(gateway_and_bus):
     result = gw._handle_proxy(message)
 
     assert "error" in result
+
+
+def test_gateway_routes_no_fly_zone_actions(gateway_and_bus):
+    gw, bus = gateway_and_bus
+
+    bus.request.return_value = {
+        "success": True,
+        "payload": {"status": "ok", "zones": []},
+    }
+
+    result = gw._handle_proxy({
+        "action": GatewayActions.GET_NO_FLY_ZONES,
+        "sender": "external",
+        "payload": {},
+    })
+
+    bus.request.assert_called_once_with(
+        ComponentTopics.NOFLYZONES_COMPONENT,
+        {
+            "action": GatewayActions.GET_NO_FLY_ZONES,
+            "sender": "orvd_gateway",
+            "payload": {},
+        },
+        timeout=10.0,
+    )
+    assert result["status"] == "ok"
 
 # Полный сценарий
 

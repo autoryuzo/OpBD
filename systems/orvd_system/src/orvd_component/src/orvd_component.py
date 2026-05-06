@@ -18,8 +18,14 @@ from datetime import datetime
 from sdk.base_component import BaseComponent
 from broker.system_bus import SystemBus
 
-
-from systems.orvd_system.src.orvd_component.topics import ExternalTopics
+try:
+    from systems.orvd_system.src.orvd_component.topics import (
+        ComponentTopics,
+        ExternalTopics,
+        OrvdActions,
+    )
+except ModuleNotFoundError:
+    from src.orvd_component.topics import ComponentTopics, ExternalTopics, OrvdActions
 
 class OrvdComponent(BaseComponent):
 
@@ -107,8 +113,12 @@ class OrvdComponent(BaseComponent):
                 },
                 timeout=self.EXTERNAL_REQUEST_TIMEOUT,
             )
-            if not v or not v.get("success") or not (v.get("payload") or {}).get("valid"):
-                return {"status": "error", "message": "regulator rejected drone certificate"}
+            if (
+                not isinstance(v, dict)
+                or not v.get("success")
+                or not (v.get("payload") or {}).get("valid")
+            ):
+                return {"status": "error", "message": "invalid certificate: regulator rejected drone certificate"}
 
         self._drones[drone_id] = payload
         self._log("drone_registered", drone_id=drone_id)
@@ -151,7 +161,6 @@ class OrvdComponent(BaseComponent):
             "mission_id": mission_id,
             "from": self.component_id,
         }
-
     # ==========================================================
     # AUTHORIZE MISSION
     # ==========================================================
@@ -200,6 +209,10 @@ class OrvdComponent(BaseComponent):
 
         if drone_id in self._active_flights:
             return {"status": "takeoff_denied", "reason": "drone already flying"}
+
+        if self._route_violates_zone(mission.get("route", [])):
+            self._log("takeoff_denied_by_zone", drone_id=drone_id, mission_id=mission_id)
+            return {"status": "takeoff_denied", "reason": "route intersects no_fly_zone"}
 
         self._active_flights[drone_id] = mission_id
         self._log("takeoff_authorized", drone_id=drone_id, mission_id=mission_id)
@@ -331,12 +344,26 @@ class OrvdComponent(BaseComponent):
     # ==========================================================
 
     def _route_violates_zone(self, route: List[Dict]) -> bool:
+        response = self._request_noflyzones(
+            OrvdActions.CHECK_NO_FLY_ROUTE,
+            {"route": route},
+        )
+        if response is not None:
+            return bool(response.get("violates"))
+
         for point in route:
             if self._point_in_no_fly_zone(point):
                 return True
         return False
 
     def _point_in_no_fly_zone(self, coords: Dict[str, Any]) -> bool:
+        response = self._request_noflyzones(
+            OrvdActions.CHECK_NO_FLY_POINT,
+            {"coords": coords},
+        )
+        if response is not None:
+            return bool(response.get("violates"))
+
         lat = coords.get("lat")
         lon = coords.get("lon")
 
@@ -360,6 +387,26 @@ class OrvdComponent(BaseComponent):
                 return True
 
         return False
+
+    def _request_noflyzones(self, action: str, payload: Dict[str, Any]) -> Any:
+        try:
+            response = self.bus.request(
+                ComponentTopics.NOFLYZONES_COMPONENT,
+                {
+                    "action": action,
+                    "sender": self.component_id,
+                    "payload": payload,
+                },
+                timeout=self.EXTERNAL_REQUEST_TIMEOUT,
+            )
+        except Exception:
+            return None
+
+        if not isinstance(response, dict) or not response.get("success"):
+            return None
+
+        payload = response.get("payload")
+        return payload if isinstance(payload, dict) else None
 
     # ==========================================================
     # HISTORY
