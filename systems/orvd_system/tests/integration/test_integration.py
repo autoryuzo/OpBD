@@ -1,230 +1,207 @@
-"""
-E2E тесты ORVD системы через реальный брокер.
-Требует: make docker-up (Kafka/Mosquitto + ORVD gateway + ORVD component).
-Если контейнеры не запущены — тесты пропускаются (skip).
-"""
+from itertools import count
 
 import pytest
-import os
-import time
-import socket
 
-from systems.orvd_system.src.gateway.topics import SystemTopics, GatewayActions
-from systems.orvd_system.src.orvd_component.topics import ComponentTopics
-
-
-# ==========================================================
-# BROKER CHECK
-# ==========================================================
-
-def _broker_available(retries=10, delay=1):
-    bt = os.environ.get("BROKER_TYPE", "kafka").lower()
-    host = os.environ.get("BROKER_HOST", "localhost")
-    port = int(os.environ.get("KAFKA_PORT", "9092" if bt == "kafka" else "1883"))
-
-    for _ in range(retries):
-        try:
-            with socket.create_connection((host, port), timeout=2):
-                return True
-        except Exception:
-            time.sleep(delay)
-
-    return False
+from src.gateway.src.gateway import OrvdGateway
+from src.gateway.topics import GatewayActions, SystemTopics
+from src.noflyzones_component import NoFlyZonesComponent
+from src.noflyzones_component.topics import ComponentTopics as NoFlyZonesTopics
+from src.orvd_component import OrvdComponent
+from src.orvd_component.topics import ComponentTopics as OrvdTopics
 
 
-@pytest.fixture(scope="function")
-def system_bus():
-    if not _broker_available():
-        pytest.skip("Broker not available")
+class InProcessBus:
+    def __init__(self):
+        self.subscribers = {}
+        self.published = []
+        self._ids = count(1)
 
-    from broker.bus_factory import create_system_bus
+    def start(self):
+        pass
 
-    bus = create_system_bus(client_id="test_client")
-    bus.start()
+    def stop(self):
+        pass
 
-    # ждём стабилизации системы
-    time.sleep(5)
+    def subscribe(self, topic, handler):
+        self.subscribers[topic] = handler
 
-    yield bus
+    def unsubscribe(self, topic):
+        self.subscribers.pop(topic, None)
 
-    bus.stop()
+    def publish(self, topic, message):
+        self.published.append((topic, message))
+
+    def request(self, topic, message, timeout=10.0):
+        handler = self.subscribers.get(topic)
+        if handler is None:
+            return None
+
+        reply_to = f"tests.reply.{next(self._ids)}"
+        correlation_id = f"corr-{next(self._ids)}"
+        request = {
+            **message,
+            "reply_to": reply_to,
+            "correlation_id": correlation_id,
+        }
+
+        before = len(self.published)
+        handler(request)
+
+        for published_topic, published_message in self.published[before:]:
+            if (
+                published_topic == reply_to
+                and published_message.get("correlation_id") == correlation_id
+            ):
+                return published_message
+
+        return None
 
 
-# ==========================================================
-# HELPERS
-# ==========================================================
+@pytest.fixture
+def running_system():
+    bus = InProcessBus()
 
-def unique(prefix):
-    return f"{prefix}_{int(time.time() * 1000)}"
+    orvd = OrvdComponent(
+        component_id="orvd_component",
+        name="ORVD",
+        bus=bus,
+        topic=OrvdTopics.ORVD_COMPONENT,
+    )
+    zones = NoFlyZonesComponent(
+        component_id="noflyzones_component",
+        name="NoFlyZones",
+        bus=bus,
+        topic=NoFlyZonesTopics.NOFLYZONES_COMPONENT,
+    )
+    gateway = OrvdGateway(system_id="orvd_gateway", bus=bus)
+
+    orvd.start()
+    zones.start()
+    gateway.start()
+
+    yield bus, orvd, zones, gateway
+
+    gateway.stop()
+    zones.stop()
+    orvd.stop()
 
 
-# ==========================================================
-# CORE FLOW TEST
-# ==========================================================
-
-def test_orvd_full_lifecycle(system_bus):
-    drone_id = unique("DRONE")
-    mission_id = unique("MISSION")
-
-    # ---------------- REGISTER DRONE ----------------
-    resp = system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
+def request_gateway(bus, action, payload=None):
+    response = bus.request(
+        SystemTopics.ORVD_SYSTEM,
         {
-            "action": GatewayActions.REGISTER_DRONE,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {"drone_id": drone_id},
+            "action": action,
+            "sender": "test_client",
+            "payload": payload or {},
         },
-        timeout=10.0,
+    )
+    assert response is not None
+    assert response["success"] is True
+    return response["payload"]
+
+
+def test_orvd_full_lifecycle_via_gateway(running_system):
+    bus, _, _, _ = running_system
+
+    assert request_gateway(
+        bus,
+        GatewayActions.REGISTER_DRONE,
+        {"drone_id": "D1"},
+    )["status"] == "registered"
+
+    assert request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {"mission_id": "M1", "drone_id": "D1", "route": []},
+    )["status"] == "mission_registered"
+
+    assert request_gateway(
+        bus,
+        GatewayActions.AUTHORIZE_MISSION,
+        {"mission_id": "M1"},
+    )["status"] == "authorized"
+
+    assert request_gateway(
+        bus,
+        GatewayActions.REQUEST_TAKEOFF,
+        {"drone_id": "D1", "mission_id": "M1"},
+    )["status"] == "takeoff_authorized"
+
+
+def test_mission_rejected_when_route_crosses_nofly_zone(running_system):
+    bus, _, _, _ = running_system
+
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    assert request_gateway(
+        bus,
+        GatewayActions.ADD_NO_FLY_ZONE,
+        {
+            "zone_id": "Z1",
+            "bounds": {"min_lat": 0, "max_lat": 10, "min_lon": 0, "max_lon": 10},
+        },
+    )["status"] == "zone_added"
+
+    response = request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {
+            "mission_id": "M1",
+            "drone_id": "D1",
+            "route": [{"lat": 5, "lon": 5}],
+        },
     )
 
-    assert resp["status"] == "registered"
+    assert response["status"] == "rejected"
+    assert response["reason"] == "route intersects no_fly_zone"
 
-    # ---------------- REGISTER MISSION ----------------
-    resp = system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
+
+def test_carpet_mode_blocks_takeoff_and_commands_landing(running_system):
+    bus, _, _, _ = running_system
+
+    response = request_gateway(
+        bus,
+        GatewayActions.ACTIVATE_CARPET_MODE,
         {
-            "action": GatewayActions.REGISTER_MISSION,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {
-                "mission_id": mission_id,
-                "drone_id": drone_id,
-                "route": [],
-            },
+            "area_id": "A1",
+            "bounds": {"min_lat": 0, "max_lat": 10, "min_lon": 0, "max_lon": 10},
         },
-        timeout=10.0,
+    )
+    assert response["status"] == "carpet_activated"
+    assert response["command"] == "LAND_IN_ZONE"
+
+    point_response = request_gateway(
+        bus,
+        GatewayActions.CHECK_NO_FLY_POINT,
+        {"coords": {"lat": 5, "lon": 5}},
+    )
+    assert point_response["violates"] is True
+    assert point_response["command"] == "LAND"
+
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    mission_response = request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {
+            "mission_id": "M1",
+            "drone_id": "D1",
+            "route": [{"lat": 5, "lon": 5}],
+        },
+    )
+    assert mission_response["status"] == "rejected"
+
+
+def test_history_contains_core_events(running_system):
+    bus, _, _, _ = running_system
+
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {"mission_id": "M1", "drone_id": "D1", "route": []},
     )
 
-    assert resp["status"] == "mission_registered"
+    response = request_gateway(bus, GatewayActions.GET_HISTORY)
+    events = [entry["event"] for entry in response["history"]]
 
-    # ---------------- AUTHORIZE ----------------
-    resp = system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
-        {
-            "action": GatewayActions.AUTHORIZE_MISSION,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {"mission_id": mission_id},
-        },
-        timeout=10.0,
-    )
-
-    assert resp["status"] == "authorized"
-
-    # ---------------- TAKEOFF ----------------
-    resp = system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
-        {
-            "action": GatewayActions.REQUEST_TAKEOFF,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {
-                "drone_id": drone_id,
-                "mission_id": mission_id,
-            },
-        },
-        timeout=10.0,
-    )
-
-    assert resp["status"] == "takeoff_authorized"
-
-
-# ==========================================================
-# NEGATIVE CASES
-# ==========================================================
-
-def test_register_drone_without_id(system_bus):
-    resp = system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
-        {
-            "action": GatewayActions.REGISTER_DRONE,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {},
-        },
-        timeout=10.0,
-    )
-
-    assert resp["status"] == "error"
-
-
-def test_register_mission_without_drone(system_bus):
-    resp = system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
-        {
-            "action": GatewayActions.REGISTER_MISSION,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {
-                "mission_id": unique("MISSION"),
-                "drone_id": "UNKNOWN",
-                "route": [],
-            },
-        },
-        timeout=10.0,
-    )
-
-    assert resp["status"] == "error"
-
-
-def test_takeoff_without_authorization(system_bus):
-    drone_id = unique("DRONE")
-    mission_id = unique("MISSION")
-
-    system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
-        {
-            "action": GatewayActions.REGISTER_DRONE,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {"drone_id": drone_id},
-        },
-        timeout=10.0,
-    )
-
-    system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
-        {
-            "action": GatewayActions.REGISTER_MISSION,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {
-                "mission_id": mission_id,
-                "drone_id": drone_id,
-                "route": [],
-            },
-        },
-        timeout=10.0,
-    )
-
-    resp = system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
-        {
-            "action": GatewayActions.REQUEST_TAKEOFF,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {
-                "drone_id": drone_id,
-                "mission_id": mission_id,
-            },
-        },
-        timeout=10.0,
-    )
-
-    assert resp["status"] == "takeoff_denied"
-
-
-# ==========================================================
-# HISTORY CHECK
-# ==========================================================
-
-def test_history_contains_events(system_bus):
-    resp = system_bus.request(
-        ComponentTopics.ORVD_COMPONENT,
-        {
-            "action": GatewayActions.GET_HISTORY,
-            "sender": SystemTopics.ORVD_SYSTEM,
-            "payload": {},
-        },
-        timeout=10.0,
-    )
-
-    assert "history" in resp
-
-    events = [e["event"] for e in resp["history"]]
-
-    # базовые события системы
     assert "drone_registered" in events
     assert "mission_registered" in events

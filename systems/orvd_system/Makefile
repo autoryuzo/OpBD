@@ -1,11 +1,21 @@
-.PHONY: help prepare unit-test test-all-docker tests docker-up docker-down docker-logs
+.PHONY: help prepare unit-test integration-test tests docker-test docker-up docker-down docker-logs
 
-PIPENV_PIPFILE = ../../config/Pipfile
-PYTEST_CONFIG = ../../config/pyproject.toml
 GENERATED = .generated
-DOCKER_COMPOSE = docker compose -f $(GENERATED)/docker-compose.yml --env-file $(GENERATED)/.env
+DOCKER = /c/Program\ Files/Docker/Docker/resources/bin/docker.exe
+DOCKER_NETWORK ?= orvd_drones_net
+DOCKER_COMPOSE = DOCKER_NETWORK=$(DOCKER_NETWORK) $(DOCKER) compose -f $(GENERATED)/docker-compose.yml --env-file $(GENERATED)/.env
+VENV_PYTHON = ../../.venv/Scripts/python.exe
+PROFILE ?= kafka
 
-PYTEST = PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv run pytest -c $(PYTEST_CONFIG)
+ifeq ($(wildcard $(VENV_PYTHON)),$(VENV_PYTHON))
+PYTHON = $(VENV_PYTHON)
+ROOT_PYTHON = .venv/Scripts/python.exe
+else
+PYTHON ?= python
+ROOT_PYTHON = $(PYTHON)
+endif
+
+PYTEST = $(PYTHON) -m pytest -p no:cacheprovider
 
 help:
 	@echo "make prepare           - Собрать docker-compose + .env из компонентов"
@@ -22,28 +32,16 @@ help:
 # ---------------------------------------------------------------------------
 
 prepare:
-	@cd ../.. && PIPENV_PIPFILE=config/Pipfile pipenv run python scripts/prepare_system.py systems/orvd_system
+	@cd ../.. && PYTHONUTF8=1 $(ROOT_PYTHON) scripts/prepare_system.py systems/orvd_system
 
 docker-up: prepare
-	@set -a && . $(GENERATED)/.env && set +a && \
-		profiles="--profile $${BROKER_TYPE:-kafka}"; \
-		[ "$${ENABLE_ELK:-false}" = "true" ] && profiles="$$profiles --profile elk"; \
-		[ "$${ENABLE_FABRIC:-false}" = "true" ] && profiles="$$profiles --profile fabric"; \
-		$(DOCKER_COMPOSE) $$profiles up -d --build
+	@$(DOCKER_COMPOSE) --profile $(PROFILE) up -d --build
 
 docker-down:
-	@set -a && . $(GENERATED)/.env && set +a && \
-		profiles="--profile $${BROKER_TYPE:-kafka}"; \
-		[ "$${ENABLE_ELK:-false}" = "true" ] && profiles="$$profiles --profile elk"; \
-		[ "$${ENABLE_FABRIC:-false}" = "true" ] && profiles="$$profiles --profile fabric"; \
-		$(DOCKER_COMPOSE) $$profiles down 2>/dev/null || true
+	@$(DOCKER_COMPOSE) --profile $(PROFILE) down
 
 docker-logs:
-	@set -a && . $(GENERATED)/.env && set +a && \
-		profiles="--profile $${BROKER_TYPE:-kafka}"; \
-		[ "$${ENABLE_ELK:-false}" = "true" ] && profiles="$$profiles --profile elk"; \
-		[ "$${ENABLE_FABRIC:-false}" = "true" ] && profiles="$$profiles --profile fabric"; \
-		$(DOCKER_COMPOSE) $$profiles logs -f
+	@$(DOCKER_COMPOSE) --profile $(PROFILE) logs -f
 
 # ---------------------------------------------------------------------------
 # TESTS
@@ -56,6 +54,10 @@ unit-test:
 integration-test:
 	@echo "=== Интеграционные тесты (in-process) ==="
 	@$(PYTEST) tests/integration/ -v --tb=short
+
+docker-test: docker-up
+	@echo "=== Docker smoke test ==="
+	@$(DOCKER_COMPOSE) ps
 
 tests: unit-test integration-test
 	@echo ""

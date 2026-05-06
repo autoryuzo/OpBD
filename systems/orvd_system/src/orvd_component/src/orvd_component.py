@@ -28,6 +28,7 @@ except ModuleNotFoundError:
     from src.orvd_component.topics import ComponentTopics, ExternalTopics, OrvdActions
 
 class OrvdComponent(BaseComponent):
+    EXTERNAL_REQUEST_TIMEOUT = 5.0
 
     def __init__(
         self,

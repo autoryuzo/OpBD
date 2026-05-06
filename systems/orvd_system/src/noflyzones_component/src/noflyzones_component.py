@@ -214,9 +214,16 @@ class NoFlyZonesComponent(BaseComponent):
                 continue
 
             bounds = zone.get("bounds", {})
+            min_lat = bounds.get("min_lat")
+            max_lat = bounds.get("max_lat")
+            min_lon = bounds.get("min_lon")
+            max_lon = bounds.get("max_lon")
+            if None in (min_lat, max_lat, min_lon, max_lon):
+                continue
+
             if (
-                bounds.get("min_lat") <= lat <= bounds.get("max_lat")
-                and bounds.get("min_lon") <= lon <= bounds.get("max_lon")
+                min_lat <= lat <= max_lat
+                and min_lon <= lon <= max_lon
             ):
                 return zone
 

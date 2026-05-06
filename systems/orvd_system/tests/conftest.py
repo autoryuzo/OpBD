@@ -1,5 +1,14 @@
 import sys
 import types
+from pathlib import Path
+
+
+SYSTEM_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = SYSTEM_ROOT.parents[1]
+
+for path in (str(SYSTEM_ROOT), str(REPO_ROOT)):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 
 # создаём фейковый модуль flask
