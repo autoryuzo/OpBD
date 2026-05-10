@@ -127,6 +127,20 @@ def test_orvd_full_lifecycle_via_gateway(running_system):
         {"drone_id": "D1", "mission_id": "M1"},
     )["status"] == "takeoff_authorized"
 
+    assert request_gateway(
+        bus,
+        GatewayActions.COMPLETE_MISSION,
+        {
+            "mission_id": "M1",
+            "result": "success",
+            "track_ref": "artifacts/E2E-S1-TC01/UAS_TLM.csv",
+        },
+    )["status"] == "mission_completed"
+
+    status = request_gateway(bus, GatewayActions.GET_MISSION_STATUS, {"mission_id": "M1"})
+    assert status["mission_status"] == "completed"
+    assert status["active"] is False
+
 
 def test_mission_rejected_when_route_crosses_nofly_zone(running_system):
     bus, _, _, _ = running_system
@@ -188,6 +202,75 @@ def test_carpet_mode_blocks_takeoff_and_commands_landing(running_system):
         },
     )
     assert mission_response["status"] == "rejected"
+
+
+def test_in_flight_incident_records_contingency_intent(running_system):
+    bus, _, _, _ = running_system
+
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {"mission_id": "M1", "drone_id": "D1", "route": []},
+    )
+    request_gateway(bus, GatewayActions.AUTHORIZE_MISSION, {"mission_id": "M1"})
+    request_gateway(bus, GatewayActions.REQUEST_TAKEOFF, {"mission_id": "M1"})
+
+    incident = request_gateway(
+        bus,
+        GatewayActions.REPORT_INCIDENT,
+        {
+            "drone_id": "D1",
+            "incident_type": "c2_loss",
+            "severity": "critical",
+            "coords": {"lat": 55.0, "lon": 37.0},
+            "contingency_intent": {"procedure": "emergency_landing", "command": "LAND"},
+            "evidence_refs": ["artifacts/E2E-S2-TC01/UAS_HLTH.jsonl"],
+        },
+    )
+
+    assert incident["status"] == "incident_recorded"
+    assert incident["command"] == "LAND"
+    assert incident["contingency_required"] is True
+
+    status = request_gateway(bus, GatewayActions.GET_MISSION_STATUS, {"mission_id": "M1"})
+    assert status["mission_status"] == "incident"
+    assert status["incidents"][0]["incident_type"] == "c2_loss"
+
+
+def test_post_mission_incident_is_linked_to_completed_mission(running_system):
+    bus, _, _, _ = running_system
+
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {"mission_id": "M1", "drone_id": "D1", "route": []},
+    )
+    request_gateway(bus, GatewayActions.AUTHORIZE_MISSION, {"mission_id": "M1"})
+    request_gateway(bus, GatewayActions.REQUEST_TAKEOFF, {"mission_id": "M1"})
+    request_gateway(bus, GatewayActions.COMPLETE_MISSION, {"mission_id": "M1"})
+
+    incident = request_gateway(
+        bus,
+        GatewayActions.REPORT_INCIDENT,
+        {
+            "mission_id": "M1",
+            "drone_id": "D1",
+            "incident_type": "post_flight_damage_detected",
+            "severity": "major",
+            "description": "Damage detected during post-flight inspection.",
+            "evidence_refs": ["artifacts/E2E-S2-TC02/PORT_EVT.jsonl"],
+        },
+    )
+
+    assert incident["status"] == "incident_recorded"
+    assert incident["mission_id"] == "M1"
+
+    history = request_gateway(bus, GatewayActions.GET_HISTORY)
+    events = [entry["event"] for entry in history["history"]]
+    assert "mission_completed" in events
+    assert "incident_reported" in events
 
 
 def test_history_contains_core_events(running_system):
