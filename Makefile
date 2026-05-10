@@ -1,4 +1,4 @@
-.PHONY: help prepare unit-test test-all-docker tests docker-up docker-down docker-logs
+.PHONY: help prepare orvd-unit-test noflyzones-unit-test unit-test integration-test test-all-docker tests docker-up docker-down docker-logs
 
 PIPENV_PIPFILE = ../../config/Pipfile
 PYTEST_CONFIG = ../../config/pyproject.toml
@@ -13,9 +13,12 @@ help:
 	@echo "make docker-up         - Запустить систему (prepare + docker compose up)"
 	@echo "make docker-down       - Остановить систему"
 	@echo "make docker-logs       - Логи"
-	@echo "make unit-test         - Unit тесты"
+	@echo "make orvd-unit-test    - Unit тесты ORVD и gateway"
+	@echo "make noflyzones-unit-test - Unit тесты компонента запретных зон"
+	@echo "make unit-test         - Все unit тесты системы"
 	@echo "make integration-test  - Интеграционные тесты (без docker)"
-	@echo "make tests             - Все тесты"
+	@echo "make test-all-docker   - Подготовка и запуск docker-системы"
+	@echo "make tests             - Все in-process тесты"
 
 # ---------------------------------------------------------------------------
 # DOCKER
@@ -49,6 +52,14 @@ docker-logs:
 # TESTS
 # ---------------------------------------------------------------------------
 
+orvd-unit-test:
+	@echo "=== Unit тесты ORVD и gateway ==="
+	@$(PYTEST) orvd_system/tests/unit/test_orvd_unit.py -v --tb=short
+
+noflyzones-unit-test:
+	@echo "=== Unit тесты компонента запретных зон ==="
+	@$(PYTEST) orvd_system/tests/unit/test_noflyzones_unit.py -v --tb=short
+
 unit-test:
 	@echo "=== Unit тесты ==="
 	@$(PYTEST) orvd_system/tests/unit/ -v --tb=short
@@ -56,6 +67,9 @@ unit-test:
 integration-test:
 	@echo "=== Интеграционные тесты (in-process) ==="
 	@$(PYTEST) orvd_system/tests/integration/ -v --tb=short
+
+test-all-docker: docker-up
+	@echo "Docker-система запущена. Используйте make docker-logs для просмотра логов."
 
 tests: unit-test integration-test
 	@echo ""

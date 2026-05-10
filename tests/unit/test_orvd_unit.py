@@ -223,6 +223,52 @@ def test_revoke_not_active(component_and_bus):
 
     assert result["status"] == "error"
 
+
+def test_complete_mission_removes_active_flight(component_and_bus):
+    component, _ = component_and_bus
+
+    component._drones["D1"] = {}
+    component._missions["M1"] = {"mission_id": "M1", "drone_id": "D1", "status": "active"}
+    component._authorized.add("M1")
+    component._active_flights["D1"] = "M1"
+
+    result = component._handle_complete_mission({
+        "payload": {"mission_id": "M1", "result": "success"}
+    })
+
+    assert result["status"] == "mission_completed"
+    assert "D1" not in component._active_flights
+    assert component._missions["M1"]["status"] == "completed"
+
+
+def test_report_incident_requires_mission_for_inactive_drone(component_and_bus):
+    component, _ = component_and_bus
+
+    result = component._handle_report_incident({
+        "payload": {"drone_id": "D1", "incident_type": "c2_loss"}
+    })
+
+    assert result["status"] == "error"
+
+
+def test_report_incident_records_active_mission(component_and_bus):
+    component, _ = component_and_bus
+
+    component._missions["M1"] = {"mission_id": "M1", "drone_id": "D1", "status": "active"}
+    component._active_flights["D1"] = "M1"
+
+    result = component._handle_report_incident({
+        "payload": {
+            "drone_id": "D1",
+            "incident_type": "c2_loss",
+            "contingency_intent": {"command": "LAND"},
+        }
+    })
+
+    assert result["status"] == "incident_recorded"
+    assert result["command"] == "LAND"
+    assert component._missions["M1"]["status"] == "incident"
+
 # telemetry
 
 def test_telemetry_without_drone_id(component_and_bus):
@@ -377,6 +423,58 @@ def test_gateway_timeout_returns_error(gateway_and_bus):
     result = gw._handle_proxy(message)
 
     assert "error" in result
+
+
+def test_gateway_routes_no_fly_zone_actions(gateway_and_bus):
+    gw, bus = gateway_and_bus
+
+    bus.request.return_value = {
+        "success": True,
+        "payload": {"status": "ok", "zones": []},
+    }
+
+    result = gw._handle_proxy({
+        "action": GatewayActions.GET_NO_FLY_ZONES,
+        "sender": "external",
+        "payload": {},
+    })
+
+    bus.request.assert_called_once_with(
+        ComponentTopics.NOFLYZONES_COMPONENT,
+        {
+            "action": GatewayActions.GET_NO_FLY_ZONES,
+            "sender": "orvd_gateway",
+            "payload": {},
+        },
+        timeout=10.0,
+    )
+    assert result["status"] == "ok"
+
+
+def test_gateway_routes_incident_actions(gateway_and_bus):
+    gw, bus = gateway_and_bus
+
+    bus.request.return_value = {
+        "success": True,
+        "payload": {"status": "incident_recorded", "incident_id": "INC-000001"},
+    }
+
+    result = gw._handle_proxy({
+        "action": GatewayActions.REPORT_INCIDENT,
+        "sender": "external",
+        "payload": {"drone_id": "D1", "mission_id": "M1"},
+    })
+
+    bus.request.assert_called_once_with(
+        ComponentTopics.ORVD_COMPONENT,
+        {
+            "action": GatewayActions.REPORT_INCIDENT,
+            "sender": "orvd_gateway",
+            "payload": {"drone_id": "D1", "mission_id": "M1"},
+        },
+        timeout=10.0,
+    )
+    assert result["status"] == "incident_recorded"
 
 # Полный сценарий
 

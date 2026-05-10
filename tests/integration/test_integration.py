@@ -1,165 +1,290 @@
-"""
-SAFE integration tests for ORVD system.
-
-НЕ ТРЕБУЮТ:
-- docker
-- kafka
-- mqtt
-- реальные брокеры
-
-Цель:
-- проверить интеграцию OrvdComponent + message handlers
-- через mocked SystemBus
-"""
+from itertools import count
 
 import pytest
-from unittest.mock import MagicMock
 
+from src.gateway.src.gateway import OrvdGateway
+from src.gateway.topics import GatewayActions, SystemTopics
+from src.noflyzones_component import NoFlyZonesComponent
+from src.noflyzones_component.topics import ComponentTopics as NoFlyZonesTopics
 from src.orvd_component import OrvdComponent
+from src.orvd_component.topics import ComponentTopics as OrvdTopics
 
 
-# ==========================================================
-# FIXTURE: fake bus
-# ==========================================================
+class InProcessBus:
+    def __init__(self):
+        self.subscribers = {}
+        self.published = []
+        self._ids = count(1)
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def subscribe(self, topic, handler):
+        self.subscribers[topic] = handler
+
+    def unsubscribe(self, topic):
+        self.subscribers.pop(topic, None)
+
+    def publish(self, topic, message):
+        self.published.append((topic, message))
+
+    def request(self, topic, message, timeout=10.0):
+        handler = self.subscribers.get(topic)
+        if handler is None:
+            return None
+
+        reply_to = f"tests.reply.{next(self._ids)}"
+        correlation_id = f"corr-{next(self._ids)}"
+        request = {
+            **message,
+            "reply_to": reply_to,
+            "correlation_id": correlation_id,
+        }
+
+        before = len(self.published)
+        handler(request)
+
+        for published_topic, published_message in self.published[before:]:
+            if (
+                published_topic == reply_to
+                and published_message.get("correlation_id") == correlation_id
+            ):
+                return published_message
+
+        return None
+
 
 @pytest.fixture
-def fake_bus():
-    bus = MagicMock()
-    bus.request.return_value = {
-        "success": True,
-        "payload": {"valid": True}
-    }
-    return bus
+def running_system():
+    bus = InProcessBus()
 
-
-@pytest.fixture
-def component(fake_bus):
-    return OrvdComponent(
-        component_id="orvd",
+    orvd = OrvdComponent(
+        component_id="orvd_component",
         name="ORVD",
-        bus=fake_bus,
+        bus=bus,
+        topic=OrvdTopics.ORVD_COMPONENT,
+    )
+    zones = NoFlyZonesComponent(
+        component_id="noflyzones_component",
+        name="NoFlyZones",
+        bus=bus,
+        topic=NoFlyZonesTopics.NOFLYZONES_COMPONENT,
+    )
+    gateway = OrvdGateway(system_id="orvd_gateway", bus=bus)
+
+    orvd.start()
+    zones.start()
+    gateway.start()
+
+    yield bus, orvd, zones, gateway
+
+    gateway.stop()
+    zones.stop()
+    orvd.stop()
+
+
+def request_gateway(bus, action, payload=None):
+    response = bus.request(
+        SystemTopics.ORVD_SYSTEM,
+        {
+            "action": action,
+            "sender": "test_client",
+            "payload": payload or {},
+        },
+    )
+    assert response is not None
+    assert response["success"] is True
+    return response["payload"]
+
+
+def test_orvd_full_lifecycle_via_gateway(running_system):
+    bus, _, _, _ = running_system
+
+    assert request_gateway(
+        bus,
+        GatewayActions.REGISTER_DRONE,
+        {"drone_id": "D1"},
+    )["status"] == "registered"
+
+    assert request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {"mission_id": "M1", "drone_id": "D1", "route": []},
+    )["status"] == "mission_registered"
+
+    assert request_gateway(
+        bus,
+        GatewayActions.AUTHORIZE_MISSION,
+        {"mission_id": "M1"},
+    )["status"] == "authorized"
+
+    assert request_gateway(
+        bus,
+        GatewayActions.REQUEST_TAKEOFF,
+        {"drone_id": "D1", "mission_id": "M1"},
+    )["status"] == "takeoff_authorized"
+
+    assert request_gateway(
+        bus,
+        GatewayActions.COMPLETE_MISSION,
+        {
+            "mission_id": "M1",
+            "result": "success",
+            "track_ref": "artifacts/E2E-S1-TC01/UAS_TLM.csv",
+        },
+    )["status"] == "mission_completed"
+
+    status = request_gateway(bus, GatewayActions.GET_MISSION_STATUS, {"mission_id": "M1"})
+    assert status["mission_status"] == "completed"
+    assert status["active"] is False
+
+
+def test_mission_rejected_when_route_crosses_nofly_zone(running_system):
+    bus, _, _, _ = running_system
+
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    assert request_gateway(
+        bus,
+        GatewayActions.ADD_NO_FLY_ZONE,
+        {
+            "zone_id": "Z1",
+            "bounds": {"min_lat": 0, "max_lat": 10, "min_lon": 0, "max_lon": 10},
+        },
+    )["status"] == "zone_added"
+
+    response = request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {
+            "mission_id": "M1",
+            "drone_id": "D1",
+            "route": [{"lat": 5, "lon": 5}],
+        },
     )
 
-
-# ==========================================================
-# DRONE FLOW
-# ==========================================================
-
-def test_register_drone(component):
-    result = component._handle_register_drone({
-        "payload": {"drone_id": "D1"}
-    })
-
-    assert result["status"] == "registered"
-    assert "D1" in component._drones
+    assert response["status"] == "rejected"
+    assert response["reason"] == "route intersects no_fly_zone"
 
 
-def test_register_drone_invalid(component):
-    # без drone_id
-    result = component._handle_register_drone({
-        "payload": {}
-    })
+def test_carpet_mode_blocks_takeoff_and_commands_landing(running_system):
+    bus, _, _, _ = running_system
 
-    assert result["status"] == "error"
+    response = request_gateway(
+        bus,
+        GatewayActions.ACTIVATE_CARPET_MODE,
+        {
+            "area_id": "A1",
+            "bounds": {"min_lat": 0, "max_lat": 10, "min_lon": 0, "max_lon": 10},
+        },
+    )
+    assert response["status"] == "carpet_activated"
+    assert response["command"] == "LAND_IN_ZONE"
 
+    point_response = request_gateway(
+        bus,
+        GatewayActions.CHECK_NO_FLY_POINT,
+        {"coords": {"lat": 5, "lon": 5}},
+    )
+    assert point_response["violates"] is True
+    assert point_response["command"] == "LAND"
 
-# ==========================================================
-# MISSION FLOW
-# ==========================================================
-
-def test_register_mission(component):
-    component._drones["D1"] = {"drone_id": "D1"}
-
-    result = component._handle_register_mission({
-        "payload": {
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    mission_response = request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {
             "mission_id": "M1",
             "drone_id": "D1",
-            "route": []
-        }
-    })
-
-    assert result["status"] == "mission_registered"
-    assert "M1" in component._missions
+            "route": [{"lat": 5, "lon": 5}],
+        },
+    )
+    assert mission_response["status"] == "rejected"
 
 
-def test_register_mission_unknown_drone(component):
-    result = component._handle_register_mission({
-        "payload": {
-            "mission_id": "M1",
-            "drone_id": "UNKNOWN",
-            "route": []
-        }
-    })
+def test_in_flight_incident_records_contingency_intent(running_system):
+    bus, _, _, _ = running_system
 
-    assert result["status"] == "error"
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {"mission_id": "M1", "drone_id": "D1", "route": []},
+    )
+    request_gateway(bus, GatewayActions.AUTHORIZE_MISSION, {"mission_id": "M1"})
+    request_gateway(bus, GatewayActions.REQUEST_TAKEOFF, {"mission_id": "M1"})
 
-
-# ==========================================================
-# AUTH + TAKEOFF
-# ==========================================================
-
-def test_authorize_and_takeoff(component):
-    component._drones["D1"] = {"drone_id": "D1"}
-    component._missions["M1"] = {"mission_id": "M1", "drone_id": "D1"}
-
-    auth = component._handle_authorize_mission({
-        "payload": {"mission_id": "M1"}
-    })
-
-    assert auth["status"] == "authorized"
-
-    takeoff = component._handle_request_takeoff({
-        "payload": {"mission_id": "M1"}
-    })
-
-    assert takeoff["status"] == "takeoff_authorized"
-
-
-def test_takeoff_without_auth(component):
-    component._drones["D1"] = {"drone_id": "D1"}
-    component._missions["M1"] = {"mission_id": "M1", "drone_id": "D1"}
-
-    resp = component._handle_request_takeoff({
-        "payload": {"mission_id": "M1"}
-    })
-
-    assert resp["status"] == "takeoff_denied"
-
-
-# ==========================================================
-# TELEMETRY + ZONE
-# ==========================================================
-
-def test_no_fly_zone_violation(component):
-    component._no_fly_zones["Z1"] = {
-        "active": True,
-        "bounds": {
-            "min_lat": 0,
-            "max_lat": 10,
-            "min_lon": 0,
-            "max_lon": 10
-        }
-    }
-
-    resp = component._handle_send_telemetry({
-        "payload": {
+    incident = request_gateway(
+        bus,
+        GatewayActions.REPORT_INCIDENT,
+        {
             "drone_id": "D1",
-            "coords": {"lat": 5, "lon": 5}
-        }
-    })
+            "incident_type": "c2_loss",
+            "severity": "critical",
+            "coords": {"lat": 55.0, "lon": 37.0},
+            "contingency_intent": {"procedure": "emergency_landing", "command": "LAND"},
+            "evidence_refs": ["artifacts/E2E-S2-TC01/UAS_HLTH.jsonl"],
+        },
+    )
 
-    assert resp["status"] == "emergency"
-    assert resp["command"] == "LAND"
+    assert incident["status"] == "incident_recorded"
+    assert incident["command"] == "LAND"
+    assert incident["contingency_required"] is True
+
+    status = request_gateway(bus, GatewayActions.GET_MISSION_STATUS, {"mission_id": "M1"})
+    assert status["mission_status"] == "incident"
+    assert status["incidents"][0]["incident_type"] == "c2_loss"
 
 
-# ==========================================================
-# HISTORY
-# ==========================================================
+def test_post_mission_incident_is_linked_to_completed_mission(running_system):
+    bus, _, _, _ = running_system
 
-def test_history(component):
-    component._log("test_event", drone_id="D1")
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {"mission_id": "M1", "drone_id": "D1", "route": []},
+    )
+    request_gateway(bus, GatewayActions.AUTHORIZE_MISSION, {"mission_id": "M1"})
+    request_gateway(bus, GatewayActions.REQUEST_TAKEOFF, {"mission_id": "M1"})
+    request_gateway(bus, GatewayActions.COMPLETE_MISSION, {"mission_id": "M1"})
 
-    resp = component._handle_get_history({})
+    incident = request_gateway(
+        bus,
+        GatewayActions.REPORT_INCIDENT,
+        {
+            "mission_id": "M1",
+            "drone_id": "D1",
+            "incident_type": "post_flight_damage_detected",
+            "severity": "major",
+            "description": "Damage detected during post-flight inspection.",
+            "evidence_refs": ["artifacts/E2E-S2-TC02/PORT_EVT.jsonl"],
+        },
+    )
 
-    assert "history" in resp
-    assert any(e["event"] == "test_event" for e in resp["history"])
+    assert incident["status"] == "incident_recorded"
+    assert incident["mission_id"] == "M1"
+
+    history = request_gateway(bus, GatewayActions.GET_HISTORY)
+    events = [entry["event"] for entry in history["history"]]
+    assert "mission_completed" in events
+    assert "incident_reported" in events
+
+
+def test_history_contains_core_events(running_system):
+    bus, _, _, _ = running_system
+
+    request_gateway(bus, GatewayActions.REGISTER_DRONE, {"drone_id": "D1"})
+    request_gateway(
+        bus,
+        GatewayActions.REGISTER_MISSION,
+        {"mission_id": "M1", "drone_id": "D1", "route": []},
+    )
+
+    response = request_gateway(bus, GatewayActions.GET_HISTORY)
+    events = [entry["event"] for entry in response["history"]]
+
+    assert "drone_registered" in events
+    assert "mission_registered" in events

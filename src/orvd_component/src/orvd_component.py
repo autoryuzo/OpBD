@@ -18,9 +18,17 @@ from datetime import datetime
 from sdk.base_component import BaseComponent
 from broker.system_bus import SystemBus
 
-from systems.orvd_system.src.orvd_component.topics import ExternalTopics
+try:
+    from systems.orvd_system.src.orvd_component.topics import (
+        ComponentTopics,
+        ExternalTopics,
+        OrvdActions,
+    )
+except ModuleNotFoundError:
+    from src.orvd_component.topics import ComponentTopics, ExternalTopics, OrvdActions
 
 class OrvdComponent(BaseComponent):
+    EXTERNAL_REQUEST_TIMEOUT = 5.0
 
     def __init__(
         self,
@@ -37,6 +45,7 @@ class OrvdComponent(BaseComponent):
         self._authorized: set = set()
         self._active_flights: Dict[str, str] = {}
         self._telemetry: Dict[str, Dict] = {}
+        self._incidents: Dict[str, Dict] = {}
         self._history: List[Dict] = []
 
         # зоны
@@ -61,6 +70,9 @@ class OrvdComponent(BaseComponent):
         self.register_handler("authorize_mission", self._handle_authorize_mission)
         self.register_handler("request_takeoff", self._handle_request_takeoff)
         self.register_handler("revoke_takeoff", self._handle_revoke_takeoff)
+        self.register_handler("complete_mission", self._handle_complete_mission)
+        self.register_handler("report_incident", self._handle_report_incident)
+        self.register_handler("get_mission_status", self._handle_get_mission_status)
         self.register_handler("send_telemetry", self._handle_send_telemetry)
         self.register_handler("request_telemetry", self._handle_request_telemetry)
         self.register_handler("get_history", self._handle_get_history)
@@ -106,8 +118,12 @@ class OrvdComponent(BaseComponent):
                 },
                 timeout=self.EXTERNAL_REQUEST_TIMEOUT,
             )
-            if not v or not v.get("success") or not (v.get("payload") or {}).get("valid"):
-                return {"status": "error", "message": "regulator rejected drone certificate"}
+            if (
+                not isinstance(v, dict)
+                or not v.get("success")
+                or not (v.get("payload") or {}).get("valid")
+            ):
+                return {"status": "error", "message": "invalid certificate: regulator rejected drone certificate"}
 
         self._drones[drone_id] = payload
         self._log("drone_registered", drone_id=drone_id)
@@ -142,6 +158,8 @@ class OrvdComponent(BaseComponent):
                 "from": self.component_id,
             }
 
+        payload["status"] = "registered"
+        payload["registered_at"] = self._now()
         self._missions[mission_id] = payload
         self._log("mission_registered", mission_id=mission_id, drone_id=drone_id)
 
@@ -162,6 +180,8 @@ class OrvdComponent(BaseComponent):
             return {"status": "error", "message": "mission not found"}
 
         self._authorized.add(mission_id)
+        self._missions[mission_id]["status"] = "authorized"
+        self._missions[mission_id]["authorized_at"] = self._now()
         self._log("mission_authorized", mission_id=mission_id)
 
         return {
@@ -199,7 +219,13 @@ class OrvdComponent(BaseComponent):
         if drone_id in self._active_flights:
             return {"status": "takeoff_denied", "reason": "drone already flying"}
 
+        if self._route_violates_zone(mission.get("route", [])):
+            self._log("takeoff_denied_by_zone", drone_id=drone_id, mission_id=mission_id)
+            return {"status": "takeoff_denied", "reason": "route intersects no_fly_zone"}
+
         self._active_flights[drone_id] = mission_id
+        mission["status"] = "active"
+        mission["takeoff_authorized_at"] = self._now()
         self._log("takeoff_authorized", drone_id=drone_id, mission_id=mission_id)
 
         return {
@@ -221,11 +247,149 @@ class OrvdComponent(BaseComponent):
             return {"status": "error", "message": "drone not active"}
 
         mission_id = self._active_flights.pop(drone_id)
+        if mission_id in self._missions:
+            self._missions[mission_id]["status"] = "landing_required"
         self._log("takeoff_revoked", drone_id=drone_id, mission_id=mission_id)
 
         return {
             "status": "landing_required",
             "drone_id": drone_id,
+            "from": self.component_id,
+        }
+
+    def _handle_complete_mission(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload", {})
+        mission_id = payload.get("mission_id")
+        drone_id = payload.get("drone_id")
+
+        if not mission_id and drone_id:
+            mission_id = self._active_flights.get(drone_id)
+
+        if not mission_id:
+            return {"status": "error", "message": "mission_id or active drone_id required"}
+
+        if mission_id not in self._missions:
+            return {"status": "error", "message": "mission not found"}
+
+        mission = self._missions[mission_id]
+        drone_id = drone_id or mission.get("drone_id")
+
+        if drone_id:
+            self._active_flights.pop(drone_id, None)
+
+        completed_at = self._now()
+        mission["status"] = "completed"
+        mission["completed_at"] = completed_at
+        mission["completion_report"] = {
+            "result": payload.get("result", "success"),
+            "summary": payload.get("summary"),
+            "track_ref": payload.get("track_ref"),
+            "evidence_refs": payload.get("evidence_refs", []),
+        }
+        self._authorized.discard(mission_id)
+        self._log(
+            "mission_completed",
+            mission_id=mission_id,
+            drone_id=drone_id,
+            result=mission["completion_report"]["result"],
+        )
+
+        return {
+            "status": "mission_completed",
+            "mission_id": mission_id,
+            "drone_id": drone_id,
+            "completed_at": completed_at,
+            "from": self.component_id,
+        }
+
+    def _handle_report_incident(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload", {})
+        drone_id = payload.get("drone_id")
+        mission_id = payload.get("mission_id")
+
+        if not drone_id and mission_id in self._missions:
+            drone_id = self._missions[mission_id].get("drone_id")
+
+        if not drone_id:
+            return {"status": "error", "message": "drone_id required"}
+
+        mission_id = mission_id or self._active_flights.get(drone_id)
+        if not mission_id:
+            return {"status": "error", "message": "mission_id required for inactive drone"}
+
+        if mission_id not in self._missions:
+            return {"status": "error", "message": "mission not found"}
+
+        incident_id = payload.get("incident_id") or f"INC-{len(self._incidents) + 1:06d}"
+        severity = payload.get("severity", "critical")
+        incident_type = payload.get("incident_type", payload.get("type", "unspecified"))
+        detected_at = payload.get("detected_at", self._now())
+        contingency_intent = payload.get("contingency_intent", {})
+        command = payload.get("command") or contingency_intent.get("command") or "LAND"
+
+        incident = {
+            "incident_id": incident_id,
+            "mission_id": mission_id,
+            "drone_id": drone_id,
+            "incident_type": incident_type,
+            "severity": severity,
+            "detected_at": detected_at,
+            "reported_at": self._now(),
+            "coords": payload.get("coords"),
+            "description": payload.get("description"),
+            "contingency_intent": contingency_intent,
+            "evidence_refs": payload.get("evidence_refs", []),
+            "status": "contingency_required",
+        }
+        self._incidents[incident_id] = incident
+        self._missions[mission_id]["status"] = "incident"
+        self._missions[mission_id].setdefault("incidents", []).append(incident_id)
+        self._log(
+            "incident_reported",
+            incident_id=incident_id,
+            mission_id=mission_id,
+            drone_id=drone_id,
+            incident_type=incident_type,
+            severity=severity,
+            command=command,
+        )
+
+        return {
+            "status": "incident_recorded",
+            "incident_id": incident_id,
+            "mission_id": mission_id,
+            "drone_id": drone_id,
+            "command": command,
+            "contingency_required": True,
+            "from": self.component_id,
+        }
+
+    def _handle_get_mission_status(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        payload = message.get("payload", {})
+        mission_id = payload.get("mission_id")
+        drone_id = payload.get("drone_id")
+
+        if not mission_id and drone_id:
+            mission_id = self._active_flights.get(drone_id)
+
+        if not mission_id:
+            return {"status": "error", "message": "mission_id or active drone_id required"}
+
+        mission = self._missions.get(mission_id)
+        if not mission:
+            return {"status": "error", "message": "mission not found"}
+
+        return {
+            "status": "ok",
+            "mission_id": mission_id,
+            "mission_status": mission.get("status", "registered"),
+            "drone_id": mission.get("drone_id"),
+            "active": mission.get("drone_id") in self._active_flights,
+            "incidents": [
+                self._incidents[incident_id]
+                for incident_id in mission.get("incidents", [])
+                if incident_id in self._incidents
+            ],
             "from": self.component_id,
         }
 
@@ -329,12 +493,26 @@ class OrvdComponent(BaseComponent):
     # ==========================================================
 
     def _route_violates_zone(self, route: List[Dict]) -> bool:
+        response = self._request_noflyzones(
+            OrvdActions.CHECK_NO_FLY_ROUTE,
+            {"route": route},
+        )
+        if response is not None:
+            return bool(response.get("violates"))
+
         for point in route:
             if self._point_in_no_fly_zone(point):
                 return True
         return False
 
     def _point_in_no_fly_zone(self, coords: Dict[str, Any]) -> bool:
+        response = self._request_noflyzones(
+            OrvdActions.CHECK_NO_FLY_POINT,
+            {"coords": coords},
+        )
+        if response is not None:
+            return bool(response.get("violates"))
+
         lat = coords.get("lat")
         lon = coords.get("lon")
 
@@ -358,6 +536,26 @@ class OrvdComponent(BaseComponent):
                 return True
 
         return False
+
+    def _request_noflyzones(self, action: str, payload: Dict[str, Any]) -> Any:
+        try:
+            response = self.bus.request(
+                ComponentTopics.NOFLYZONES_COMPONENT,
+                {
+                    "action": action,
+                    "sender": self.component_id,
+                    "payload": payload,
+                },
+                timeout=self.EXTERNAL_REQUEST_TIMEOUT,
+            )
+        except Exception:
+            return None
+
+        if not isinstance(response, dict) or not response.get("success"):
+            return None
+
+        payload = response.get("payload")
+        return payload if isinstance(payload, dict) else None
 
     # ==========================================================
     # HISTORY

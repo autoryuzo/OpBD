@@ -12,11 +12,14 @@ from typing import Optional
 from sdk.base_gateway import BaseGateway
 from broker.system_bus import SystemBus
 
-from systems.orvd_system.src.gateway.topics import (
-    SystemTopics,
-    ComponentTopics,
-    GatewayActions,
-)
+try:
+    from systems.orvd_system.src.gateway.topics import (
+        SystemTopics,
+        ComponentTopics,
+        GatewayActions,
+    )
+except ModuleNotFoundError:
+    from src.gateway.topics import SystemTopics, ComponentTopics, GatewayActions
 
 
 class OrvdGateway(BaseGateway):
@@ -27,10 +30,19 @@ class OrvdGateway(BaseGateway):
         GatewayActions.AUTHORIZE_MISSION: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.REQUEST_TAKEOFF: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.REVOKE_TAKEOFF: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.COMPLETE_MISSION: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.REPORT_INCIDENT: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.GET_MISSION_STATUS: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.SEND_TELEMETRY: ComponentTopics.ORVD_COMPONENT,
         GatewayActions.REQUEST_TELEMETRY: ComponentTopics.ORVD_COMPONENT,
-        GatewayActions.ADD_NO_FLY_ZONE: ComponentTopics.ORVD_COMPONENT,
-        GatewayActions.REMOVE_NO_FLY_ZONE: ComponentTopics.ORVD_COMPONENT,
+        GatewayActions.ADD_NO_FLY_ZONE: ComponentTopics.NOFLYZONES_COMPONENT,
+        GatewayActions.UPDATE_NO_FLY_ZONE: ComponentTopics.NOFLYZONES_COMPONENT,
+        GatewayActions.REMOVE_NO_FLY_ZONE: ComponentTopics.NOFLYZONES_COMPONENT,
+        GatewayActions.GET_NO_FLY_ZONES: ComponentTopics.NOFLYZONES_COMPONENT,
+        GatewayActions.CHECK_NO_FLY_POINT: ComponentTopics.NOFLYZONES_COMPONENT,
+        GatewayActions.CHECK_NO_FLY_ROUTE: ComponentTopics.NOFLYZONES_COMPONENT,
+        GatewayActions.ACTIVATE_CARPET_MODE: ComponentTopics.NOFLYZONES_COMPONENT,
+        GatewayActions.DEACTIVATE_CARPET_MODE: ComponentTopics.NOFLYZONES_COMPONENT,
         GatewayActions.GET_HISTORY: ComponentTopics.ORVD_COMPONENT,
         
 
