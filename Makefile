@@ -1,12 +1,14 @@
 .PHONY: help prepare orvd-unit-test noflyzones-unit-test unit-test integration-test test-all-docker tests docker-up docker-down docker-logs
 
-PIPENV_PIPFILE = ../../config/Pipfile
-PYTEST_CONFIG = ../../config/pyproject.toml
+MONOREPO_ROOT := $(abspath ../..)
+SYSTEM_SLUG   ?= orvd_system
+SYSTEM_DIR    := systems/$(SYSTEM_SLUG)
+
+PIPENV  = cd $(MONOREPO_ROOT) && PIPENV_PIPFILE=config/Pipfile pipenv
+PYTEST  = cd $(MONOREPO_ROOT) && PYTHONPATH=$(MONOREPO_ROOT) PIPENV_PIPFILE=config/Pipfile pipenv run pytest -c config/pyproject.toml
 GENERATED = .generated
 DOCKER_COMPOSE = docker compose -f $(GENERATED)/docker-compose.yml --env-file $(GENERATED)/.env
 
-PIPENV = PIPENV_PIPFILE=$(PIPENV_PIPFILE) pipenv
-PYTEST = cd ../.. && $(PIPENV) run pytest -c config/pyproject.toml
 
 help:
 	@echo "make prepare           - Собрать docker-compose + .env из компонентов"
@@ -54,19 +56,21 @@ docker-logs:
 
 orvd-unit-test:
 	@echo "=== Unit тесты ORVD и gateway ==="
-	@$(PYTEST) orvd_system/tests/unit/test_orvd_unit.py -v --tb=short
+	@$(PYTEST) $(SYSTEM_DIR)/tests/unit/test_orvd_unit.py -v --tb=short
 
 noflyzones-unit-test:
 	@echo "=== Unit тесты компонента запретных зон ==="
-	@$(PYTEST) orvd_system/tests/unit/test_noflyzones_unit.py -v --tb=short
+	@$(PYTEST) $(SYSTEM_DIR)/tests/unit/test_noflyzones_unit.py -v --tb=short
 
 unit-test:
 	@echo "=== Unit тесты ==="
-	@$(PYTEST) orvd_system/tests/unit/ -v --tb=short
+	@$(PYTEST) $(SYSTEM_DIR)/tests/unit/ -v --tb=short
 
 integration-test:
 	@echo "=== Интеграционные тесты (in-process) ==="
-	@$(PYTEST) orvd_system/tests/integration/ -v --tb=short
+	@$(PYTEST) $(SYSTEM_DIR)/tests/integration/ -v --tb=short
+
+
 
 test-all-docker: docker-up
 	@echo "Docker-система запущена. Используйте make docker-logs для просмотра логов."
