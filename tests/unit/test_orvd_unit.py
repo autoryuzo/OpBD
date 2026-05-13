@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
 
-from src.gateway.src.gateway import OrvdGateway
-from src.orvd_component import OrvdComponent
-from src.gateway.topics import ComponentTopics, GatewayActions
+from systems.orvd_system.src.gateway.src.gateway import OrvdGateway
+from systems.orvd_system.src.orvd_component import OrvdComponent
+from systems.orvd_system.src.gateway.topics import ComponentTopics, GatewayActions
 
 
 # ==========================================================

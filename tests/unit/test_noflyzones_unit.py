@@ -2,8 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.noflyzones_component import NoFlyZonesComponent
-from src.noflyzones_component.topics import ComponentTopics, NoFlyZonesActions
+from systems.orvd_system.src.noflyzones_component import NoFlyZonesComponent
+from systems.orvd_system.src.noflyzones_component.topics import ComponentTopics, NoFlyZonesActions
 
 
 @pytest.fixture

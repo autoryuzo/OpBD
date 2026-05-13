@@ -2,12 +2,12 @@ from itertools import count
 
 import pytest
 
-from src.gateway.src.gateway import OrvdGateway
-from src.gateway.topics import GatewayActions, SystemTopics
-from src.noflyzones_component import NoFlyZonesComponent
-from src.noflyzones_component.topics import ComponentTopics as NoFlyZonesTopics
-from src.orvd_component import OrvdComponent
-from src.orvd_component.topics import ComponentTopics as OrvdTopics
+from systems.orvd_system.src.gateway.src.gateway import OrvdGateway
+from systems.orvd_system.src.gateway.topics import GatewayActions, SystemTopics
+from systems.orvd_system.src.noflyzones_component import NoFlyZonesComponent
+from systems.orvd_system.src.noflyzones_component.topics import ComponentTopics as NoFlyZonesTopics
+from systems.orvd_system.src.orvd_component import OrvdComponent
+from systems.orvd_system.src.orvd_component.topics import ComponentTopics as OrvdTopics
 
 
 class InProcessBus:
