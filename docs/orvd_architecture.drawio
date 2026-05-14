@@ -1,0 +1,76 @@
+<mxfile host="Electron" agent="Mozilla/5.0">
+  <diagram id="page-1" name="Страница-1">
+    <mxGraphModel dx="3473" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontStyle=1;fontSize=16;fontColor=#000000;" value="Базовая архитектура системы ОрВД БАС" vertex="1">
+          <mxGeometry height="34" width="840" x="380" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontSize=11;fontColor=#000000;" value="Диаграмма для diagrams.net: ТЗ, требования безопасности и архитектура" vertex="1">
+          <mxGeometry height="24" width="910" x="345" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#d9ead3;" value="&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;ЦБ:&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;1. выполняются только авторизованные команды управления полетами БАС&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;2. Вылет БАС разрешается только при наличии авторизованной миссии&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;3. При любых обстоятельствах БАС не выполняют полеты в запретных зонах&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;4. Система обеспечивает возможность отзыва разрешения на полет и принудительной посадки БАС&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;5. Орвд использует только подлинные и целостные данные о состоянии БАС&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;6. Все события фиксируются с указанием времен, источника&amp;nbsp;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;ПБ:&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;1. Внешние системы (БАС, эксплуатанты) являются благонадежными и не скомпрометированы на момент взаимодействия с Орвд&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;2. Брокер сообщений обеспечивает доставку сообщений без искажения, не допускает несанкционированного доступа к топикам&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;3. идентификаторы БАС, миссий и сертификатов являются уникальным и не могут быть подделаны или повторно использованы&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;4. телеметрия, передаваемая БАС, отражает реальное состояние и не подменяется&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="600" width="550" x="1010" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#000000;fillColor=none;fontStyle=1;fontSize=14;fontColor=#000000;" value="Наша система ОрВД БАС" vertex="1">
+          <mxGeometry height="470" width="710" x="280" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#f4cccc;" value="Эксплуатант (внешняя система)" vertex="1">
+          <mxGeometry height="70" width="190" x="10" y="805" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#f4cccc;" value="БАС / симулятор (внешняя система)" vertex="1">
+          <mxGeometry height="70" width="180" x="345" y="1010" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#f4cccc;" value="pgAdmin (администрирование)" vertex="1">
+          <mxGeometry height="70" width="190" x="690" y="405" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#fff2cc;" value="Kafka брокер сообщений" vertex="1">
+          <mxGeometry height="80" width="230" x="320" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#fff2cc;" value="Проверка миссий и геозон" vertex="1">
+          <mxGeometry height="80" width="280" x="295" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#d9ead3;" value="Аудит и журналирование (время, источник, событие)" vertex="1">
+          <mxGeometry height="80" width="230" x="770" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#d9ead3;" value="PostgreSQL хранилище данных" vertex="1">
+          <mxGeometry height="80" width="250" x="660" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="17" edge="1" parent="1" source="8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#cc0000;fontColor=#FFFFFF;endArrow=block;endFill=1;" target="11" value="сообщения">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="20" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#cc0000;fontColor=#FFFFFF;endArrow=block;endFill=1;" target="9" value="команды">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="21" edge="1" parent="1" source="9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#cc0000;fontColor=#FFFFFF;endArrow=block;endFill=1;" target="11" value="телеметрия">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="22" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#d6b656;fontColor=#FFFFFF;endArrow=block;endFill=1;" target="13" value="проверка миссий">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280" y="610" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="23" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#66a61e;fontColor=#FFFFFF;endArrow=block;endFill=1;" target="14" value="фиксирование событий">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="420" y="650" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="24" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#66a61e;fontColor=#FFFFFF;endArrow=block;endFill=1;" target="15" value="чтение / запись">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="420" y="650" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="25" edge="1" parent="1" source="14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#66a61e;fontColor=#FFFFFF;endArrow=block;endFill=1;" target="15" value="запись журнала">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="26" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#cc0000;fontColor=#FFFFFF;endArrow=block;endFill=1;" target="15" value="управление">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="UDPVxMsMtX4hLu0VtFhh-28" parent="1" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;fontColor=#000000;fillColor=#d9ead3;align=center;labelPosition=center;verticalLabelPosition=middle;verticalAlign=middle;textShadow=0;" value="&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Эксплуатант - красный&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Это внешняя сторона, не часть вашей системы. Вы не разрабатываете её безопасно внутри проекта, а только принимаете/проверяете входящие сообщения через брокер.&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;БАС / симулятор - красный&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Тоже внешняя система. Она не входит в доверенную часть вашей разработки, а является внешним источником команд/телеметрии.&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;pgAdmin -&amp;nbsp; красный&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Это вспомогательный внешний инструмент администрирования, не часть рабочего контура ОрВД. Он не участвует в управлении полётами как бизнес-функция.&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Kafka&amp;nbsp; - жёлтый&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Центральная точка обмена сообщениями. Если здесь ошибка, затрагиваются сразу цели безопасности: авторизация команд, целостность сообщений, отсутствие подмены, доставка без искажения, контроль доступа к топикам. Это критический узел.&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Проверка миссий и геозон - жёлтый&amp;nbsp;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Этот блок напрямую влияет на ключевые ЦБ: авторизованная миссия, запретные зоны, разрешение на вылет. Ошибка здесь сразу даёт нарушение безопасности полётов.&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Аудит и журналирование - зелёный&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Важный внутренний компонент, потому что обеспечивает трассируемость, фиксацию времени и источника событий. Он нужен для ЦБ по журналированию, но обычно не является прямым «гейтом» управления полётом.&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;PostgreSQL - зелёный&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(1, 1, 1); font-size: 13px;&quot;&gt;Это внутреннее хранилище данных вашей системы. Оно важно для целостности миссий, статусов и журналов, но в текущей раскладке относится к поддерживающей инфраструктуре, а не к самому критическому контуру принятия решений&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="640" width="530" x="-530" y="360" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
