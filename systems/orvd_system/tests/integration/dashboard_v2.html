@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>СКИБ — Кибериммунный дрон</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#0a0c0f;--bg2:#111418;--bg3:#181c22;--border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);--text:#e8eaf0;--text2:#8b9099;--text3:#555b65;--g:#00d084;--gbg:rgba(0,208,132,.08);--gbd:rgba(0,208,132,.25);--r:#ff5252;--rbg:rgba(255,82,82,.08);--rbd:rgba(255,82,82,.25);--a:#ffb300;--abg:rgba(255,179,0,.08);--abd:rgba(255,179,0,.25);--p:#9b7fff;--pbg:rgba(155,127,255,.08);--pbd:rgba(155,127,255,.25);--b:#4d9fff;--bbg:rgba(77,159,255,.08);--bbd:rgba(77,159,255,.25);--fm:'JetBrains Mono',monospace;--fu:'Syne',sans-serif;--rr:10px;--rl:16px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{font-family:var(--fu);background:var(--bg);color:var(--text);overflow:hidden}
+.app{display:grid;grid-template-columns:222px 1fr;grid-template-rows:54px 1fr;height:100vh}
+.topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border);background:var(--bg2);z-index:50}
+.logo{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;letter-spacing:-.3px}
+.logo-icon{width:28px;height:28px;background:var(--g);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:16px;height:16px}
+.topbar-r{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--text2);font-family:var(--fm)}
+.blv{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.5px;cursor:pointer;border:1px solid transparent;transition:all .2s}
+.blv.on{background:var(--gbg);border-color:var(--gbd);color:var(--g)}
+.blv.off{background:var(--rbg);border-color:var(--rbd);color:var(--r)}
+.blv.wait{background:var(--abg);border-color:var(--abd);color:var(--a)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nsec{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:1px;text-transform:uppercase;padding:10px 8px 4px}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--rr);cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all .15s;border:1px solid transparent}
+.ni:hover{background:var(--bg3);color:var(--text)}.ni.active{background:var(--bg3);color:var(--text);border-color:var(--border2)}.ni svg{opacity:.6;flex-shrink:0}.ni.active svg{opacity:1}
+.npip{width:6px;height:6px;border-radius:50%;margin-left:auto;flex-shrink:0}
+.main{overflow-y:auto;padding:24px 28px;display:flex;flex-direction:column;gap:20px;background:var(--bg)}
+.page{display:none;flex-direction:column;gap:18px}.page.active{display:flex}
+.ptitle{font-size:21px;font-weight:800;letter-spacing:-.5px}.psub{font-size:12px;color:var(--text2);margin-top:3px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:18px 22px}
+.ctitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:13px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px}
+.ml{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px}
+.mv{font-size:30px;font-weight:800;margin:5px 0 3px;letter-spacing:-1px}
+.ms{font-size:11px;color:var(--text2);font-family:var(--fm)}
+.metric.g .mv{color:var(--g)}.metric.a .mv{color:var(--a)}.metric.p .mv{color:var(--p)}.metric.b .mv{color:var(--b)}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.4px}
+.badge.ok{background:var(--gbg);color:var(--g);border:1px solid var(--gbd)}
+.badge.err{background:var(--rbg);color:var(--r);border:1px solid var(--rbd)}
+.badge.warn{background:var(--abg);color:var(--a);border:1px solid var(--abd)}
+.badge.info{background:var(--bbg);color:var(--b);border:1px solid var(--bbd)}
+.badge.off{background:var(--bg3);color:var(--text3);border:1px solid var(--border2)}
+.btn{font-family:var(--fu);font-size:12px;font-weight:600;padding:7px 14px;border-radius:var(--rr);border:1px solid var(--border2);background:var(--bg3);color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--bg2);border-color:var(--border2)}.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.g{background:var(--gbg);border-color:var(--gbd);color:var(--g)}.btn.g:hover{background:rgba(0,208,132,.14)}
+.btn.r{background:var(--rbg);border-color:var(--rbd);color:var(--r)}.btn.r:hover{background:rgba(255,82,82,.14)}
+.btn.b2{background:var(--bbg);border-color:var(--bbd);color:var(--b)}.btn.a{background:var(--abg);border-color:var(--abd);color:var(--a)}
+.field{margin-bottom:10px}.field label{display:block;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+.field input,.field select{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rr);color:var(--text);font-family:var(--fm);font-size:12px;padding:7px 11px;outline:none;transition:border-color .15s}
+.field input:focus,.field select:focus{border-color:var(--g)}.field select option{background:var(--bg3)}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.res{margin-top:10px;background:#060809;border:1px solid var(--border);border-radius:var(--rr);padding:9px 12px;font-family:var(--fm);font-size:11px;min-height:36px;color:var(--text2);line-height:1.6;display:none;white-space:pre-wrap;word-break:break-all}
+.res.show{display:block}.res.ok{color:var(--g);border-color:var(--gbd)}.res.err{color:var(--r);border-color:var(--rbd)}.res.load{color:var(--a);border-color:var(--abd)}
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cbar{padding:9px 14px;border-radius:var(--rr);font-size:11.5px;display:flex;align-items:center;gap:10px;font-family:var(--fm);border:1px solid var(--abd);background:var(--abg);color:var(--a)}
+.cbar.on{border-color:var(--gbd);background:var(--gbg);color:var(--g)}.cbar.off{border-color:var(--rbd);background:var(--rbg);color:var(--r)}
+.cbar-d{font-size:10px;color:var(--text3);margin-top:2px}
+.comp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.cc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;position:relative;overflow:hidden}
+.cc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.cc.tr::before{background:var(--g)}.cc.ut::before{background:var(--r)}.cc.mo::before{background:var(--p)}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cn{font-size:13px;font-weight:700}
+.ctag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;letter-spacing:.3px}
+.ttr{background:var(--gbg);color:var(--g);border:1px solid var(--gbd)}
+.tut{background:var(--rbg);color:var(--r);border:1px solid var(--rbd)}
+.tmo{background:var(--pbg);color:var(--p);border:1px solid var(--pbd)}
+.cd{font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:10px}
+.topics{display:flex;flex-wrap:wrap;gap:4px}
+.topic{font-family:var(--fm);font-size:10px;background:rgba(255,255,255,.04);border:1px solid var(--border2);color:var(--text3);padding:2px 6px;border-radius:6px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;text-align:left;padding:0 12px 10px;border-bottom:1px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);font-family:var(--fm);font-size:11px}
+tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.02)}
+.lc{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.ls{background:#060809;border:1px solid var(--border);border-radius:var(--rl);padding:12px 16px;height:350px;overflow-y:auto;font-family:var(--fm);font-size:11.5px;line-height:2}
+.ls::-webkit-scrollbar{width:3px}.ls::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.ll{display:flex;gap:10px}.lt{color:var(--text3);flex-shrink:0;font-size:10.5px}
+.lsrc{flex-shrink:0;min-width:90px;font-size:10.5px}.lm{color:var(--text);word-break:break-all;font-size:11px}
+.ok{color:var(--g)}.er{color:var(--r)}.wa{color:var(--a)}.in{color:var(--b)}.sy{color:var(--p)}
+.gg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;display:flex;gap:12px}
+.gid{font-family:var(--fm);font-size:10px;font-weight:600;color:var(--text3);flex-shrink:0;margin-top:2px}
+.gtitle{font-size:13px;font-weight:700;margin-bottom:4px}
+.gdesc{font-size:11px;color:var(--text2);line-height:1.5}
+.gst{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;margin-top:7px;padding:2px 7px;border-radius:10px}
+.sd{background:var(--gbg);color:var(--g);border:1px solid var(--gbd)}.sw{background:var(--abg);color:var(--a);border:1px solid var(--abd)}
+.if{display:flex;flex-direction:column}
+.is{display:flex;gap:14px;position:relative}
+.is::before{content:'';position:absolute;left:17px;top:36px;bottom:-1px;width:2px;background:var(--border2)}
+.is:last-child::before{display:none}
+.inum{width:36px;height:36px;background:var(--bg3);border:1px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;font-family:var(--fm);z-index:1;position:relative}
+.ic{padding:8px 0 20px;flex:1}.ititle{font-size:13px;font-weight:700;margin-bottom:4px}
+.idesc{font-size:11px;color:var(--text2);line-height:1.6}
+.icode{margin-top:7px;background:#060809;border:1px solid var(--border);border-radius:var(--rr);padding:8px 12px;font-family:var(--fm);font-size:10.5px;color:var(--g);line-height:1.7}
+.drone-list{display:flex;flex-direction:column;gap:6px}
+.dr{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rr);padding:9px 12px;font-size:11px;font-family:var(--fm)}
+.did{color:var(--g);flex:1}
+#zones-map{height:460px;border-radius:var(--rl);overflow:hidden;border:1px solid var(--border)}
+.mapbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.mhint{font-size:11px;color:var(--text3);font-family:var(--fm);margin-left:auto}
+.zdel{background:none;border:none;color:var(--r);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;font-family:var(--fm)}
+.zdel:hover{background:var(--rbg)}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1000;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:26px;width:440px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:5px}
+.modal p{font-size:12px;color:var(--text2);margin-bottom:18px;line-height:1.6}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.mnote{font-family:var(--fm);font-size:11px;margin-top:8px;padding:8px 10px;border-radius:var(--rr);display:none}
+.mnote.show{display:block}.mnote.ok{background:var(--gbg);color:var(--g);border:1px solid var(--gbd)}.mnote.err{background:var(--rbg);color:var(--r);border:1px solid var(--rbd)}.mnote.load{background:var(--abg);color:var(--a);border:1px solid var(--abd)}
+.leaflet-popup-content-wrapper{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--fu);font-size:12px;box-shadow:0 4px 24px rgba(0,0,0,.5)}
+.leaflet-popup-tip{background:var(--bg2)}.leaflet-bar a{background:var(--bg2);color:var(--text);border-color:var(--border2)}.leaflet-bar a:hover{background:var(--bg3)}
+.leaflet-control-attribution{background:rgba(10,12,15,.8)!important;color:var(--text3)!important;font-size:9px!important}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="topbar">
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2L13 5V11L8 14L3 11V5L8 2Z" stroke="#0a0c0f" stroke-width="1.5" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="#0a0c0f"/></svg></div>
+    СКИБ · Кибериммунный дрон
+  </div>
+  <div class="topbar-r">
+    <span id="clock">--:--:--</span>
+    <div class="blv off" id="brbadge" onclick="openM('mc')" title="Настройка подключения">
+      <div class="dot"></div><span id="btxt">НЕТ БРОКЕРА</span>
+    </div>
+  </div>
+</header>
+
+<nav class="sidebar">
+  <div class="nsec">Система</div>
+  <div class="ni active" onclick="go('overview',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Обзор<div class="npip" style="background:var(--g)"></div></div>
+  <div class="ni" onclick="go('arch',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Архитектура</div>
+  <div class="ni" onclick="go('components',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>Компоненты</div>
+  <div class="nsec">Управление</div>
+  <div class="ni" onclick="go('control',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Управление дронами<div class="npip" id="cpip" style="background:var(--a);display:none"></div></div>
+  <div class="ni" onclick="go('zones',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>Запретные зоны</div>
+  <div class="nsec">Безопасность</div>
+  <div class="ni" onclick="go('policy',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Политика доступа</div>
+  <div class="ni" onclick="go('goals',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Цели безопасности</div>
+  <div class="ni" onclick="go('isolation',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Изоляция доменов</div>
+  <div class="nsec">Мониторинг</div>
+  <div class="ni" onclick="go('log',this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Журнал событий<div class="npip" id="lpip" style="background:var(--a)"></div></div>
+</nav>
+
+<main class="main">
+
+<!-- OVERVIEW -->
+<div class="page active" id="page-overview">
+  <div><div class="ptitle">Панель управления</div><div class="psub">ГОСТ Р 72118-2025 · Кибериммунная система управления БПЛА</div></div>
+  <div class="metrics">
+    <div class="metric g"><div class="ml">Дронов</div><div class="mv" id="m-d">—</div><div class="ms" id="m-ds">нет соединения</div></div>
+    <div class="metric a"><div class="ml">Взлётов авт.</div><div class="mv" id="m-f">—</div><div class="ms" id="m-fs">авторизовано</div></div>
+    <div class="metric p"><div class="ml">Домены безоп.</div><div class="mv">4</div><div class="ms">изолированных</div></div>
+    <div class="metric b"><div class="ml">Запретных зон</div><div class="mv" id="m-z">0</div><div class="ms" id="m-zs">активных</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="card">
+      <div class="ctitle">Статус компонентов</div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px"><span>ORVD Component</span><span class="badge off" id="sc">—</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px"><span>ORVD Gateway</span><span class="badge off" id="sg">—</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px"><span>ORVD Journal</span><span class="badge off" id="sj">—</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px"><span>Брокер Kafka/MQTT</span><span class="badge err" id="sb">OFFLINE</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px"><span>Security Monitor</span><span class="badge warn">ПЛАН</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ctitle">История событий (live)</div>
+      <div id="ovh" style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text2)"><div style="color:var(--text3);font-family:var(--fm);font-size:11px">Подключитесь к брокеру →</div></div>
+      <button class="btn" style="margin-top:10px;font-size:11px" onclick="fetchH()">↻ Обновить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ARCHITECTURE -->
+<div class="page" id="page-arch">
+  <div><div class="ptitle">Архитектура системы</div><div class="psub">Доверенные и недоверенные домены · брокер как единый канал коммуникации</div></div>
+  <div class="card" style="padding:20px">
+    <svg viewBox="0 0 900 520" style="width:100%" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="aw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker><style>.at{font-family:'Syne',sans-serif}.am{font-family:'JetBrains Mono',monospace}@keyframes dk{to{stroke-dashoffset:-16}}.fl{stroke-dasharray:5 4;animation:dk 1.4s linear infinite}</style></defs>
+      <rect x="20" y="20" width="370" height="380" rx="18" fill="rgba(0,208,132,.04)" stroke="rgba(0,208,132,.35)" stroke-width="1.5"/>
+      <text x="40" y="48" class="at" font-size="11" font-weight="600" fill="rgba(0,208,132,.7)" letter-spacing="1">ДОВЕРЕННЫЙ ДОМЕН</text>
+      <rect x="510" y="20" width="370" height="380" rx="18" fill="rgba(255,82,82,.04)" stroke="rgba(255,82,82,.35)" stroke-width="1.5" stroke-dasharray="7 4"/>
+      <text x="530" y="48" class="at" font-size="11" font-weight="600" fill="rgba(255,82,82,.7)" letter-spacing="1">НЕДОВЕРЕННЫЙ ДОМЕН</text>
+      <rect x="50" y="70" width="310" height="72" rx="10" fill="rgba(0,208,132,.1)" stroke="rgba(0,208,132,.5)" stroke-width="1.5"/>
+      <text x="205" y="101" class="at" text-anchor="middle" font-size="14" font-weight="700" fill="#00d084">ORVD Component</text>
+      <text x="205" y="120" class="am" text-anchor="middle" font-size="10" fill="rgba(0,208,132,.6)">управление · авторизация · регистрация</text>
+      <rect x="50" y="165" width="148" height="62" rx="10" fill="rgba(0,208,132,.07)" stroke="rgba(0,208,132,.35)" stroke-width="1"/>
+      <text x="124" y="191" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#00d084">Менеджер</text><text x="124" y="208" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#00d084">миссий</text>
+      <rect x="212" y="165" width="148" height="62" rx="10" fill="rgba(0,208,132,.07)" stroke="rgba(0,208,132,.35)" stroke-width="1"/>
+      <text x="286" y="191" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#00d084">ORVD</text><text x="286" y="208" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#00d084">Journal</text>
+      <rect x="50" y="252" width="310" height="52" rx="10" fill="rgba(0,208,132,.15)" stroke="rgba(0,208,132,.6)" stroke-width="2"/>
+      <text x="205" y="274" class="at" text-anchor="middle" font-size="13" font-weight="700" fill="#00d084">ORVD Gateway</text>
+      <text x="205" y="291" class="am" text-anchor="middle" font-size="10" fill="rgba(0,208,132,.5)">единственная точка входа</text>
+      <rect x="540" y="70" width="310" height="62" rx="10" fill="rgba(255,82,82,.07)" stroke="rgba(255,82,82,.4)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text x="695" y="97" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#ff5252">Телеметрия</text>
+      <text x="695" y="114" class="am" text-anchor="middle" font-size="10" fill="rgba(255,82,82,.5)">GPS · высота · скорость</text>
+      <rect x="540" y="153" width="148" height="62" rx="10" fill="rgba(255,82,82,.07)" stroke="rgba(255,82,82,.4)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text x="614" y="179" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#ff5252">Запретные</text><text x="614" y="196" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#ff5252">зоны</text>
+      <rect x="702" y="153" width="148" height="62" rx="10" fill="rgba(255,82,82,.07)" stroke="rgba(255,82,82,.4)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text x="776" y="179" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#ff5252">Внешние</text><text x="776" y="196" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#ff5252">системы</text>
+      <rect x="540" y="236" width="310" height="52" rx="10" fill="rgba(255,82,82,.07)" stroke="rgba(255,82,82,.4)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text x="695" y="258" class="at" text-anchor="middle" font-size="13" font-weight="600" fill="#ff5252">Регулятор (БПВС / КОС)</text>
+      <text x="695" y="275" class="am" text-anchor="middle" font-size="10" fill="rgba(255,82,82,.5)">сертификаты · разрешения</text>
+      <rect x="350" y="185" width="200" height="60" rx="12" fill="rgba(155,127,255,.12)" stroke="rgba(155,127,255,.6)" stroke-width="2"/>
+      <text x="450" y="211" class="at" text-anchor="middle" font-size="13" font-weight="700" fill="#9b7fff">Монитор</text><text x="450" y="228" class="at" text-anchor="middle" font-size="13" font-weight="700" fill="#9b7fff">безопасности</text>
+      <rect x="325" y="340" width="250" height="52" rx="12" fill="rgba(155,127,255,.1)" stroke="rgba(155,127,255,.45)" stroke-width="1.5"/>
+      <text x="450" y="362" class="at" text-anchor="middle" font-size="13" font-weight="700" fill="#9b7fff">Брокер сообщений</text>
+      <text x="450" y="379" class="am" text-anchor="middle" font-size="10" fill="rgba(155,127,255,.6)">Kafka / MQTT</text>
+      <ellipse cx="130" cy="460" rx="58" ry="22" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+      <text x="130" y="464" class="at" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.4)">Оператор</text>
+      <ellipse cx="770" cy="460" rx="58" ry="22" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+      <text x="770" y="464" class="at" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.4)">Дрон</text>
+      <line class="fl" x1="130" y1="438" x2="130" y2="306" stroke="rgba(0,208,132,.5)" stroke-width="1.5" marker-end="url(#aw)"/>
+      <line class="fl" x1="250" y1="304" x2="370" y2="340" stroke="rgba(0,208,132,.5)" stroke-width="1.5" marker-end="url(#aw)"/>
+      <line class="fl" x1="450" y1="340" x2="450" y2="246" stroke="rgba(155,127,255,.6)" stroke-width="1.5" marker-end="url(#aw)"/>
+      <line class="fl" x1="350" y1="205" x2="362" y2="142" stroke="rgba(155,127,255,.5)" stroke-width="1" marker-end="url(#aw)"/>
+      <line class="fl" x1="770" y1="438" x2="770" y2="288" stroke="rgba(255,82,82,.4)" stroke-width="1.5" marker-end="url(#aw)"/>
+      <line class="fl" x1="600" y1="288" x2="545" y2="358" stroke="rgba(255,82,82,.4)" stroke-width="1" marker-end="url(#aw)"/>
+    </svg>
+  </div>
+</div>
+
+<!-- COMPONENTS -->
+<div class="page" id="page-components">
+  <div><div class="ptitle">Компоненты системы</div><div class="psub">Каждый компонент — изолированный контейнер с чёткими границами доверия</div></div>
+  <div class="comp-grid">
+    <div class="cc tr"><div class="ch"><span class="cn">ORVD Component</span><span class="ctag ttr">Доверенный</span></div><div class="cd">Центральный компонент. Авторизует взлёт, проверяет сертификаты, обрабатывает регистрацию. Защита от replay-атак.</div><div class="topics"><span class="topic">drone/mission/request</span><span class="topic">drone/takeoff/request</span><span class="topic">ordv/authorization</span></div></div>
+    <div class="cc tr"><div class="ch"><span class="cn">ORVD Gateway</span><span class="ctag ttr">Доверенный · мост</span></div><div class="cd">Единственная точка входа. Allow-list — пропускает только разрешённые топики. Валидирует формат запросов.</div><div class="topics"><span class="topic">drone/mission/response</span><span class="topic">ordv/emergency</span></div></div>
+    <div class="cc tr"><div class="ch"><span class="cn">ORVD Journal</span><span class="ctag ttr">Доверенный</span></div><div class="cd">Аудит-лог всех событий. Неизменяемый append-only лог. Записывает взлёты, ошибки, нарушения политики.</div><div class="topics"><span class="topic">journal/write</span><span class="topic">journal/query</span></div></div>
+    <div class="cc ut"><div class="ch"><span class="cn">Телеметрия дрона</span><span class="ctag tut">Недоверенный</span></div><div class="cd">GPS, высота, скорость с борта. Недоверенная — может быть подделана. Валидируется монитором безопасности.</div><div class="topics"><span class="topic">drone/telemetry</span></div></div>
+    <div class="cc ut"><div class="ch"><span class="cn">Запретные зоны</span><span class="ctag tut">Недоверенный</span></div><div class="cd">Геофенсинг данные (КОС, БПВС). Маршрут проверяется перед авторизацией взлёта. Источник не доверяется напрямую.</div><div class="topics"><span class="topic">ordv/no_fly_zones</span></div></div>
+    <div class="cc mo"><div class="ch"><span class="cn">Security Monitor</span><span class="ctag tmo">Ядро СКИБ</span></div><div class="cd">Перехватывает все сообщения между доменами. Применяет allow-list политику. Приоритет: вынести в отдельный контейнер.</div><div class="topics"><span class="topic">monitor/intercept</span><span class="topic">monitor/policy</span><span class="topic">monitor/alert</span></div></div>
+  </div>
+</div>
+
+<!-- CONTROL -->
+<div class="page" id="page-control">
+  <div><div class="ptitle">Управление дронами</div><div class="psub">Реальные команды через Gateway · все запросы проходят через монитор безопасности</div></div>
+  <div class="cbar" id="cbar">
+    <div style="flex:1"><div id="cbartxt">⚠ Нет соединения — нажмите «НЕТ БРОКЕРА» в шапке</div><div class="cbar-d" id="cbard"></div></div>
+    <button class="btn" onclick="openM('mc')">Подключиться</button>
+  </div>
+  <div class="cg">
+    <div class="card"><div class="ctitle">1. Регистрация дрона</div>
+      <div class="field"><label>Drone ID</label><input id="rd" value="DRONE001"></div>
+      <div class="field"><label>Модель</label><input id="rm" value="DJI Phantom 4"></div>
+      <div class="field"><label>Оператор</label><input id="ro" value="Operator1"></div>
+      <button class="btn g" onclick="cRegDrone()">▶ Зарегистрировать дрон</button><div class="res" id="rrd"></div>
+    </div>
+    <div class="card"><div class="ctitle">2. Регистрация миссии</div>
+      <div class="fr"><div class="field"><label>Drone ID</label><input id="md" value="DRONE001"></div><div class="field"><label>Mission ID</label><input id="mi" type="number" value="101"></div></div>
+      <div class="fr"><div class="field"><label>Lat старта</label><input id="ml1" type="number" value="55.7558"></div><div class="field"><label>Lon старта</label><input id="mn1" type="number" value="37.6173"></div></div>
+      <div class="fr"><div class="field"><label>Lat конца</label><input id="ml2" type="number" value="55.7570"></div><div class="field"><label>Lon конца</label><input id="mn2" type="number" value="37.6190"></div></div>
+      <div class="field"><label>Скорость (м/с)</label><input id="mv" type="number" value="10.5"></div>
+      <button class="btn g" onclick="cRegMis()">▶ Зарегистрировать миссию</button><div class="res" id="rrm"></div>
+    </div>
+    <div class="card"><div class="ctitle">3. Авторизация → Взлёт</div>
+      <div class="field"><label>Mission ID для авторизации</label><input id="am" type="number" value="101"></div>
+      <button class="btn g" onclick="cAuthMis()">▶ Авторизовать миссию</button><div class="res" id="ram"></div>
+      <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+      <div class="fr"><div class="field"><label>Drone ID</label><input id="td" value="DRONE001"></div><div class="field"><label>Mission ID</label><input id="tm" type="number" value="101"></div></div>
+      <button class="btn g" onclick="cTakeoff()">▶ Запросить взлёт</button><div class="res" id="rto"></div>
+    </div>
+    <div class="card"><div class="ctitle">4. Телеметрия / Посадка</div>
+      <div class="field"><label>Drone ID</label><input id="teld" value="DRONE001"></div>
+      <div class="fr"><div class="field"><label>Широта</label><input id="tla" type="number" value="55.7559"></div><div class="field"><label>Долгота</label><input id="tlo" type="number" value="37.6175"></div></div>
+      <div class="fr"><div class="field"><label>Высота (м)</label><input id="tal" type="number" value="120"></div><div class="field"><label>Скорость (м/с)</label><input id="tsp" type="number" value="10"></div></div>
+      <button class="btn b2" onclick="cTelemetry()">▶ Отправить телеметрию</button><div class="res" id="rtel"></div>
+      <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+      <div class="field"><label>Drone ID для посадки</label><input id="rvd" value="DRONE001"></div>
+      <button class="btn r" onclick="cRevoke()">⊘ Принудительная посадка</button><div class="res" id="rrv"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="ctitle" style="margin:0">Зарегистрированные дроны</div>
+      <button class="btn" style="font-size:11px" onclick="fetchH()">↻ Обновить</button>
+    </div>
+    <div class="drone-list" id="dlist"><div style="color:var(--text3);font-family:var(--fm);font-size:11px">Нет данных — подключитесь к системе</div></div>
+  </div>
+</div>
+
+<!-- ZONES -->
+<div class="page" id="page-zones">
+  <div><div class="ptitle">Запретные зоны</div><div class="psub">Рисуйте зоны на карте или вводите координаты вручную · изменения отправляются через Gateway</div></div>
+  <div class="card" style="padding:16px">
+    <div class="ctitle">Интерактивная карта</div>
+    <div class="mapbar">
+      <button class="btn r" id="bdraw" onclick="toggleDraw()">✎ Нарисовать зону</button>
+      <button class="btn" onclick="fitAll()">⊡ Показать все зоны</button>
+      <button class="btn b2" onclick="fitMoscow()">⌖ Москва</button>
+      <span class="mhint" id="mhint">Нажмите «Нарисовать зону» и выделите прямоугольник</span>
+    </div>
+    <div id="zones-map"></div>
+  </div>
+  <div class="cg">
+    <div class="card"><div class="ctitle">Добавить зону (форма)</div>
+      <div class="field"><label>Zone ID</label><input id="zid" value="zone1"></div>
+      <div class="fr"><div class="field"><label>Min Lat</label><input id="zmla" type="number" value="55.7550" step="0.0001"></div><div class="field"><label>Max Lat</label><input id="zmxa" type="number" value="55.7565" step="0.0001"></div></div>
+      <div class="fr"><div class="field"><label>Min Lon</label><input id="zmlo" type="number" value="37.6160" step="0.0001"></div><div class="field"><label>Max Lon</label><input id="zmxo" type="number" value="37.6180" step="0.0001"></div></div>
+      <div style="display:flex;gap:8px"><button class="btn r" onclick="cAddZone()">+ Добавить</button><button class="btn" onclick="previewForm()">⌖ Превью на карте</button></div>
+      <div class="res" id="rza"></div>
+    </div>
+    <div class="card"><div class="ctitle">Удалить зону / Экстренная команда</div>
+      <div class="field"><label>Zone ID для удаления</label><input id="zrmid" placeholder="zone1"></div>
+      <button class="btn r" onclick="cRemZone()">✕ Удалить зону</button><div class="res" id="rzrm"></div>
+      <div style="border-top:1px solid var(--border);margin:14px 0"></div>
+      <div class="ctitle">Экстренная команда дрону</div>
+      <div class="fr"><div class="field"><label>Drone ID</label><input id="emd" value="DRONE001"></div><div class="field"><label>Команда</label><select id="emc"><option value="LAND">LAND — посадка</option><option value="RTH">RTH — возврат</option><option value="HOVER">HOVER — зависание</option></select></div></div>
+      <button class="btn r" onclick="cEmergency()">⚡ Выполнить</button><div class="res" id="rem"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="ctitle" style="margin:0">Активные зоны</div>
+      <button class="btn" style="font-size:11px" onclick="renderZTable()">↻</button>
+    </div>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>Zone ID</th><th>Min Lat</th><th>Max Lat</th><th>Min Lon</th><th>Max Lon</th><th>Статус</th><th></th></tr></thead>
+      <tbody id="ztbody"><tr><td colspan="7" style="color:var(--text3);font-family:var(--fu)">Нет зон — добавьте через форму или карту</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- POLICY -->
+<div class="page" id="page-policy">
+  <div><div class="ptitle">Политика безопасности</div><div class="psub">Allow-list: запрещено всё, что явно не разрешено · принцип наименьших привилегий</div></div>
+  <div class="card"><div class="tbl-wrap"><table>
+    <thead><tr><th>Action / Топик</th><th>Направление</th><th>Решение</th><th>Цель SG</th><th>Обоснование</th></tr></thead>
+    <tbody>
+      <tr><td>register_drone</td><td>Оператор → ORVD Component</td><td><span class="badge ok">ALLOW</span></td><td>SG-01, SG-02</td><td style="font-family:var(--fu);color:var(--text2)">Через шлюз, валидация формата</td></tr>
+      <tr><td>register_mission</td><td>Оператор → ORVD Component</td><td><span class="badge ok">ALLOW</span></td><td>SG-01, SG-03</td><td style="font-family:var(--fu);color:var(--text2)">Проверка маршрута на зоны</td></tr>
+      <tr><td>authorize_mission</td><td>ORVD Component (внутр.)</td><td><span class="badge ok">ALLOW</span></td><td>SG-03</td><td style="font-family:var(--fu);color:var(--text2)">Только доверенный компонент</td></tr>
+      <tr><td>request_takeoff</td><td>Дрон → ORVD Component</td><td><span class="badge warn">COND</span></td><td>SG-01, SG-03</td><td style="font-family:var(--fu);color:var(--text2)">Миссия должна быть авторизована</td></tr>
+      <tr><td>revoke_takeoff</td><td>ORVD Component → Дрон</td><td><span class="badge ok">ALLOW</span></td><td>SG-03</td><td style="font-family:var(--fu);color:var(--text2)">Принудительная посадка</td></tr>
+      <tr><td>send_telemetry</td><td>Дрон → ORVD Component</td><td><span class="badge warn">COND</span></td><td>SG-04</td><td style="font-family:var(--fu);color:var(--text2)">Только зарег. дрон, через монитор</td></tr>
+      <tr><td>add_no_fly_zone</td><td>Оператор → ORVD Component</td><td><span class="badge ok">ALLOW</span></td><td>SG-03</td><td style="font-family:var(--fu);color:var(--text2)">Только авторизованный оператор</td></tr>
+      <tr><td>remove_no_fly_zone</td><td>Оператор → ORVD Component</td><td><span class="badge ok">ALLOW</span></td><td>SG-03</td><td style="font-family:var(--fu);color:var(--text2)">Только авторизованный оператор</td></tr>
+      <tr><td>ordv/emergency</td><td>ORVD Component → Дрон</td><td><span class="badge ok">ALLOW</span></td><td>SG-03, SG-06</td><td style="font-family:var(--fu);color:var(--text2)">Немедленное исполнение</td></tr>
+      <tr><td>get_history</td><td>Оператор → Journal</td><td><span class="badge ok">ALLOW</span></td><td>SG-05</td><td style="font-family:var(--fu);color:var(--text2)">Аудит всех событий</td></tr>
+      <tr><td>* (недоверенный → доверенный)</td><td>Телеметрия/Зоны → ORVD</td><td><span class="badge err">DENY</span></td><td>SG-04</td><td style="font-family:var(--fu);color:var(--text2)">По умолчанию запрещено</td></tr>
+    </tbody>
+  </table></div>
+  <div style="margin-top:12px;font-size:11px;color:var(--text3)">COND — с условием: миссия авторизована, дрон зарегистрирован, маршрут не пересекает запретные зоны.</div>
+  </div>
+</div>
+
+<!-- GOALS -->
+<div class="page" id="page-goals">
+  <div><div class="ptitle">Цели безопасности</div><div class="psub">Security Goals согласно ГОСТ Р 72118-2025 и методологии KasperskyOS</div></div>
+  <div class="gg">
+    <div class="gc"><div class="gid">SG-01</div><div><div class="gtitle">Аутентификация компонентов</div><div class="gdesc">Только авторизованные компоненты могут взаимодействовать с системой. Каждый компонент имеет уникальный идентификатор, верифицируемый монитором.</div><span class="gst sd">✓ Реализовано</span></div></div>
+    <div class="gc"><div class="gid">SG-02</div><div><div class="gtitle">Контроль периметра</div><div class="gdesc">Все внешние взаимодействия проходят только через Gateway. Прямой доступ к внутренним компонентам исключён на уровне сетевой изоляции Docker.</div><span class="gst sd">✓ Реализовано</span></div></div>
+    <div class="gc"><div class="gid">SG-03</div><div><div class="gtitle">Авторизация полётов</div><div class="gdesc">Дрон не может взлететь без явной авторизации от ORVD Component. Проверяются запретные зоны, сертификат регулятора и состояние миссии.</div><span class="gst sd">✓ Реализовано</span></div></div>
+    <div class="gc"><div class="gid">SG-04</div><div><div class="gtitle">Изоляция недоверенных доменов</div><div class="gdesc">Телеметрия и внешние данные физически изолированы от доверенного ядра. Контейнерная изоляция + политика брокера не допускают прямой связи.</div><span class="gst sd">✓ Реализовано</span></div></div>
+    <div class="gc"><div class="gid">SG-05</div><div><div class="gtitle">Аудит и журналирование</div><div class="gdesc">Все значимые события записываются в ORVD Journal. Журнал изолирован — компоненты могут только добавлять записи, но не изменять существующие.</div><span class="gst sd">✓ Реализовано</span></div></div>
+    <div class="gc"><div class="gid">SG-06</div><div><div class="gtitle">Мониторинг безопасности</div><div class="gdesc">Security Monitor перехватывает все сообщения и применяет политику allow-list. Сейчас логика встроена в компоненты — планируется вынести в отдельный контейнер.</div><span class="gst sw">⚠ В работе</span></div></div>
+  </div>
+</div>
+
+<!-- ISOLATION -->
+<div class="page" id="page-isolation">
+  <div><div class="ptitle">Изоляция доменов</div><div class="psub">Как контролируется взаимодействие между доверенным и недоверенным доменами</div></div>
+  <div class="card"><div class="ctitle">Поток авторизации взлёта</div>
+    <div class="if">
+      <div class="is"><div class="inum" style="color:var(--b)">1</div><div class="ic"><div class="ititle">Запрос от оператора</div><div class="idesc">Оператор регистрирует дрон и миссию через Gateway. ORVD Component — единственный авторизующий компонент.</div><div class="icode">register_drone → register_mission → authorize_mission</div></div></div>
+      <div class="is"><div class="inum" style="color:var(--p)">2</div><div class="ic"><div class="ititle">Перехват монитором</div><div class="idesc">Монитор перехватывает сообщение в брокере и проверяет политику allow-list.</div><div class="icode">Monitor: check_policy(action="register_drone") → ALLOW</div></div></div>
+      <div class="is"><div class="inum" style="color:var(--a)">3</div><div class="ic"><div class="ititle">Проверка запретных зон</div><div class="idesc">ORVD Component проверяет маршрут миссии. Если пересекает зону — отклоняет.</div><div class="icode">register_mission: route intersects no_fly_zone? → rejected / mission_registered</div></div></div>
+      <div class="is"><div class="inum" style="color:var(--a)">4</div><div class="ic"><div class="ititle">Запрос взлёта от дрона</div><div class="idesc">Дрон отправляет запрос с mission_id. ORVD Component проверяет авторизацию миссии.</div><div class="icode">request_takeoff(drone_id, mission_id) → takeoff_authorized / denied</div></div></div>
+      <div class="is"><div class="inum" style="color:var(--g)">5</div><div class="ic"><div class="ititle">Выдача авторизации</div><div class="idesc">ORVD Component выдаёт авторизацию. Событие записывается в Journal. Телеметрия начинает мониторинг.</div><div class="icode">ordv/authorization: {"authorized": true} + journal.write(flight_auth_success)</div></div></div>
+    </div>
+  </div>
+  <div class="card"><div class="ctitle">Четыре уровня изоляции</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">
+      <div style="padding:13px;background:var(--bg3);border-radius:var(--rr);border:1px solid var(--border)"><div style="font-weight:700;margin-bottom:5px;color:var(--g)">1. Сетевая изоляция</div><div style="color:var(--text2);font-size:11px;line-height:1.6">Docker networks разделяют домены. Недоверенные контейнеры не имеют прямого доступа к доверенным.</div></div>
+      <div style="padding:13px;background:var(--bg3);border-radius:var(--rr);border:1px solid var(--border)"><div style="font-weight:700;margin-bottom:5px;color:var(--p)">2. Брокер как посредник</div><div style="color:var(--text2);font-size:11px;line-height:1.6">Все коммуникации через Kafka/MQTT. Прямые TCP-соединения между компонентами запрещены конфигурацией.</div></div>
+      <div style="padding:13px;background:var(--bg3);border-radius:var(--rr);border:1px solid var(--border)"><div style="font-weight:700;margin-bottom:5px;color:var(--a)">3. Политика allow-list</div><div style="color:var(--text2);font-size:11px;line-height:1.6">Монитор применяет явную политику: запрещено всё, что не разрешено явно. Каждое правило привязано к SG.</div></div>
+      <div style="padding:13px;background:var(--bg3);border-radius:var(--rr);border:1px solid var(--border)"><div style="font-weight:700;margin-bottom:5px;color:var(--b)">4. Аудит всех событий</div><div style="color:var(--text2);font-size:11px;line-height:1.6">ORVD Journal фиксирует все события. Попытки нарушения политики логируются и инициируют тревогу.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- LOG -->
+<div class="page" id="page-log">
+  <div><div class="ptitle">Журнал событий</div><div class="psub">Real-time лог монитора безопасности · все взаимодействия компонентов</div></div>
+  <div class="card">
+    <div class="lc">
+      <button class="btn g" id="bstart" onclick="startSim()">▶ Симуляция</button>
+      <button class="btn" id="bstop" disabled onclick="stopSim()">⏸ Пауза</button>
+      <button class="btn b2" onclick="fetchH(true)">↻ Реальная история</button>
+      <button class="btn r" onclick="clearLog()">✕ Очистить</button>
+      <span style="font-family:var(--fm);font-size:11px;color:var(--text2);margin-left:auto">
+        Скорость: <input type="range" min="200" max="2000" value="700" step="100" id="spd" oninput="updSpd(this.value)" style="width:70px;vertical-align:middle">
+        <span id="spdl">0.7с</span>
+      </span>
+    </div>
+    <div class="ls" id="logstream">
+      <div class="ll"><span class="lt">--:--:--</span><span class="lsrc sy">[SYSTEM]  </span><span class="lm">Кибериммунный монитор инициализирован. ГОСТ Р 72118-2025.</span></div>
+      <div class="ll"><span class="lt">--:--:--</span><span class="lsrc sy">[SYSTEM]  </span><span class="lm">Загрузка политики безопасности... 11 правил загружено.</span></div>
+      <div class="ll"><span class="lt">--:--:--</span><span class="lsrc wa">[BROKER]  </span><span class="lm">⚠ Брокер не подключён — нажмите «НЕТ БРОКЕРА» для настройки</span></div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<!-- MODAL: CONNECT -->
+<div class="modal-bg" id="mc">
+  <div class="modal">
+    <h3>Подключение к OpBD</h3>
+    <p>Укажите адрес HTTP API Gateway. Система должна быть запущена:<br><code style="font-family:var(--fm);color:var(--g)">cd systems/orvd_system &amp;&amp; make docker-up</code></p>
+    <div class="field"><label>URL Gateway</label><input id="cfgu" value="http://localhost:8080"></div>
+    <div class="field"><label>Тип брокера</label><select id="cfgb"><option value="kafka">Kafka</option><option value="mqtt">MQTT</option></select></div>
+    <div class="mnote" id="cnote"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeM('mc')">Отмена</button>
+      <button class="btn b2" onclick="testConn()">Проверить</button>
+      <button class="btn g" onclick="saveConn()">Подключиться</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NEW ZONE FROM MAP -->
+<div class="modal-bg" id="mz">
+  <div class="modal">
+    <h3>Новая запретная зона</h3>
+    <p>Координаты получены с карты. Введите ID зоны и подтвердите.</p>
+    <div class="field"><label>Zone ID</label><input id="mzid" placeholder="zone1"></div>
+    <div class="fr"><div class="field"><label>Min Lat</label><input id="mzmla" type="number" step="0.0001"></div><div class="field"><label>Max Lat</label><input id="mzmxa" type="number" step="0.0001"></div></div>
+    <div class="fr"><div class="field"><label>Min Lon</label><input id="mzmlo" type="number" step="0.0001"></div><div class="field"><label>Max Lon</label><input id="mzmxo" type="number" step="0.0001"></div></div>
+    <div class="mnote" id="mznote"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="cancelDraw()">Отмена</button>
+      <button class="btn r" onclick="confirmDraw()">+ Добавить зону</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────
+const S = {
+  connected: false,
+  url: localStorage.getItem('gw_url') || 'http://localhost:8080',
+  broker: localStorage.getItem('gw_br') || 'kafka',
+  zones: JSON.parse(localStorage.getItem('zones') || '[]'),
+  drones: [], history: []
+};
+document.getElementById('cfgu').value = S.url;
+
+// ── CLOCK ──────────────────────────────────────────────
+setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleTimeString('ru-RU'); }, 1000);
+document.getElementById('clock').textContent = new Date().toLocaleTimeString('ru-RU');
+
+// ── NAV ────────────────────────────────────────────────
+function go(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'log') document.getElementById('lpip').style.display = 'none';
+  if (name === 'zones') setTimeout(() => { map && map.invalidateSize(); renderZTable(); }, 80);
+}
+
+// ── MODALS ─────────────────────────────────────────────
+function openM(id)  { document.getElementById(id).classList.add('open'); }
+function closeM(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── CONNECTION ─────────────────────────────────────────
+async function testConn() {
+  const url = document.getElementById('cfgu').value.trim();
+  const n = document.getElementById('cnote');
+  n.className = 'mnote show load'; n.textContent = '⏳ Проверяю...';
+  try {
+    const r = await fetch(url + '/health', { signal: AbortSignal.timeout(3000) });
+    n.className = 'mnote show ' + (r.ok ? 'ok' : 'err');
+    n.textContent = r.ok ? '✓ Gateway отвечает!' : `⚠ Код ${r.status}`;
+  } catch(e) {
+    n.className = 'mnote show err';
+    n.textContent = '✕ Нет ответа. Запустите: make docker-up';
+  }
+}
+function saveConn() {
+  S.url = document.getElementById('cfgu').value.trim();
+  S.broker = document.getElementById('cfgb').value;
+  localStorage.setItem('gw_url', S.url); localStorage.setItem('gw_br', S.broker);
+  S.connected = true; setBadge(true); closeM('mc');
+  alog('ok', '[GATEWAY] ', `Подключён к ${S.url} (${S.broker})`);
+  fetchH();
+}
+function setBadge(on) {
+  const b = document.getElementById('brbadge'); const t = document.getElementById('btxt');
+  b.className = 'blv ' + (on ? 'on' : 'off');
+  t.textContent = on ? 'БРОКЕР ОНЛАЙН' : 'НЕТ БРОКЕРА';
+  const bar = document.getElementById('cbar');
+  if (on) {
+    bar.className = 'cbar on';
+    document.getElementById('cbartxt').textContent = '✓ Подключён к OpBD';
+    document.getElementById('cbard').textContent = S.url + ' · ' + S.broker.toUpperCase();
+    ['sc','sg','sj'].forEach(id => { const e=document.getElementById(id); e.className='badge ok'; e.textContent='OK'; });
+    const sb = document.getElementById('sb'); sb.className='badge ok'; sb.textContent='ONLINE';
+  } else {
+    bar.className = 'cbar';
+    document.getElementById('cbartxt').textContent = '⚠ Нет соединения — нажмите «НЕТ БРОКЕРА»';
+    document.getElementById('cbard').textContent = '';
+  }
+}
+
+// ── API ────────────────────────────────────────────────
+async function api(action, payload) {
+  const eps = [
+    { url: S.url + '/api/command',             body: { action, payload } },
+    { url: S.url + '/api/' + action,            body: payload },
+    { url: S.url + '/' + action.replace(/_/g,'/'), body: payload },
+  ];
+  let last;
+  for (const ep of eps) {
+    try {
+      const r = await fetch(ep.url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(ep.body), signal:AbortSignal.timeout(7000) });
+      if (r.status === 404) { last = new Error('404'); continue; }
+      return await r.json();
+    } catch(e) { last = e; }
+  }
+  throw new Error('Gateway недоступен: ' + (last?.message || 'timeout'));
+}
+function sres(id, data, err) {
+  const e = document.getElementById(id);
+  e.className = 'res show ' + (err ? 'err' : 'ok');
+  e.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+function sload(id, msg) { const e=document.getElementById(id); e.className='res show load'; e.textContent='⏳ '+msg; }
+
+// ── COMMANDS ───────────────────────────────────────────
+function v(id) { return document.getElementById(id).value.trim(); }
+function fl(id){ return parseFloat(document.getElementById(id).value); }
+function it(id){ return parseInt(document.getElementById(id).value); }
+
+async function cRegDrone() {
+  const p = { drone_id:v('rd'), model:v('rm'), operator:v('ro'), additional_info:{} };
+  sload('rrd','Отправка...'); alog('in','[GATEWAY] ',`register_drone: ${p.drone_id}`);
+  try { const r=await api('register_drone',p); sres('rrd',r,r.status==='error'); alog(r.status==='registered'?'ok':'wa','[ORVD]    ',`${p.drone_id}: ${r.status}`); if(r.status==='registered') fetchH(); }
+  catch(e) { sres('rrd',e.message,true); alog('er','[ERROR]   ',e.message); }
+}
+async function cRegMis() {
+  const p = { mission_id:it('mi'), drone_id:v('md'), route:[{lat:fl('ml1'),lon:fl('mn1')},{lat:fl('ml2'),lon:fl('mn2')}], time:new Date().toISOString(), velocity:fl('mv') };
+  sload('rrm','Регистрация...'); alog('in','[GATEWAY] ',`register_mission: #${p.mission_id} → ${p.drone_id}`);
+  try { const r=await api('register_mission',p); sres('rrm',r,r.status==='rejected'||r.status==='error'); alog(r.status==='mission_registered'?'ok':'wa','[ORVD]    ',`Миссия #${p.mission_id}: ${r.status}${r.reason?' — '+r.reason:''}`); }
+  catch(e) { sres('rrm',e.message,true); alog('er','[ERROR]   ',e.message); }
+}
+async function cAuthMis() {
+  const p = { mission_id:it('am') }; sload('ram','Авторизация...'); alog('in','[GATEWAY] ',`authorize_mission: #${p.mission_id}`);
+  try { const r=await api('authorize_mission',p); sres('ram',r,r.status==='error'); alog(r.status==='authorized'?'ok':'wa','[ORVD]    ',`Миссия #${p.mission_id}: ${r.status}`); }
+  catch(e) { sres('ram',e.message,true); alog('er','[ERROR]   ',e.message); }
+}
+async function cTakeoff() {
+  const p = { drone_id:v('td'), mission_id:it('tm'), time:new Date().toISOString() };
+  sload('rto','Запрос взлёта...'); alog('in','[GATEWAY] ',`request_takeoff: ${p.drone_id} #${p.mission_id}`);
+  try {
+    const r=await api('request_takeoff',p); const ok=r.status==='takeoff_authorized';
+    sres('rto',r,!ok); alog(ok?'ok':'wa','[ORVD]    ',ok?`Взлёт авторизован: ${p.drone_id}`:`Отклонено: ${r.reason||r.status}`);
+    if(ok) { alog('ok','[MONITOR] ','ALLOW: request_takeoff (SG-03) → journal.write'); }
+  } catch(e) { sres('rto',e.message,true); alog('er','[ERROR]   ',e.message); }
+}
+async function cTelemetry() {
+  const p = { drone_id:v('teld'), coords:{lat:fl('tla'),lon:fl('tlo')}, altitude:it('tal'), speed:it('tsp') };
+  sload('rtel','Отправка...'); alog('in','[TELEMETRY]',`GPS: ${p.coords.lat}°N ${p.coords.lon}°E alt=${p.altitude}m`);
+  try {
+    const r=await api('send_telemetry',p); sres('rtel',r,r.status==='emergency'||r.status==='error');
+    if(r.status==='emergency') alog('er','[EMERGENCY]',`⚠ ПОСАДКА: ${r.reason}`);
+    else alog('ok','[ORVD]    ',`Телеметрия принята: ${p.drone_id}`);
+    updDroneMarker(p.drone_id, p.coords.lat, p.coords.lon, p.altitude);
+  } catch(e) { sres('rtel',e.message,true); alog('er','[ERROR]   ',e.message); }
+}
+async function cRevoke() {
+  const p={drone_id:v('rvd')}; sload('rrv','Отзыв...'); alog('wa','[GATEWAY] ',`revoke_takeoff: ${p.drone_id}`);
+  try { const r=await api('revoke_takeoff',p); sres('rrv',r,r.status==='error'); alog('wa','[ORVD]    ',`Посадка: ${p.drone_id}`); }
+  catch(e) { sres('rrv',e.message,true); alog('er','[ERROR]   ',e.message); }
+}
+async function cAddZone() {
+  const p = { zone_id:v('zid'), type:'no_fly', bounds:{min_lat:fl('zmla'),max_lat:fl('zmxa'),min_lon:fl('zmlo'),max_lon:fl('zmxo')}, active:true };
+  sload('rza','Добавление...'); alog('wa','[ZONES]   ',`add_no_fly_zone: ${p.zone_id}`);
+  try { const r=await api('add_no_fly_zone',p); sres('rza',r,r.status==='error'); alog(r.status==='zone_added'?'ok':'wa','[ORVD]    ',`Зона ${p.zone_id}: ${r.status}`); }
+  catch(e) { sres('rza',e.message+' (зона сохранена локально)',true); alog('er','[ERROR]   ',e.message); }
+  addZoneLocal({ zone_id:p.zone_id, bounds:p.bounds, active:true });
+}
+async function cRemZone() {
+  const zid=v('zrmid'); sload('rzrm','Удаление...'); alog('wa','[GATEWAY] ',`remove_no_fly_zone: ${zid}`);
+  try { const r=await api('remove_no_fly_zone',{zone_id:zid}); sres('rzrm',r,r.status==='error'); alog('ok','[ORVD]    ',`Зона ${zid} удалена`); }
+  catch(e) { sres('rzrm',e.message,true); alog('er','[ERROR]   ',e.message); }
+  rmZoneLocal(zid);
+}
+async function cEmergency() {
+  const p={command:v('emc'),drone_id:v('emd'),time:new Date().toISOString()};
+  sload('rem','Экстренная команда...'); alog('er','[EMERGENCY]',`⚡ ${p.command} → ${p.drone_id}`);
+  try { const r=await api('emergency',p); sres('rem',r,r.status==='error'); alog('wa','[ORVD]    ',`Команда: ${r.status||'sent'}`); }
+  catch(e) { sres('rem',e.message,true); alog('er','[ERROR]   ',e.message); }
+}
+
+// ── HISTORY ────────────────────────────────────────────
+async function fetchH(toLog) {
+  if (!S.connected) return;
+  try {
+    const r = await api('get_history', {});
+    if (r && r.history) {
+      S.history = r.history;
+      renderOv(r.history); renderDrones(r.history); updMetrics(r.history);
+      if (toLog) {
+        alog('sy','[JOURNAL] ',`История: ${r.history.length} событий`);
+        r.history.slice(-8).forEach(ev => alog('in','[JOURNAL] ',`${(ev.timestamp||'').slice(11,19)} ${ev.event}${ev.drone_id?' '+ev.drone_id:''}${ev.mission_id?' #'+ev.mission_id:''}`));
+      }
+    }
+  } catch(e) { if(toLog) alog('er','[ERROR]   ','История недоступна: '+e.message); }
+}
+function renderOv(h) {
+  const el = document.getElementById('ovh');
+  if (!h.length) { el.innerHTML='<div style="color:var(--text3);font-size:11px;font-family:var(--fm)">История пуста</div>'; return; }
+  el.innerHTML = h.slice(-7).reverse().map(ev=>`<div style="display:flex;gap:8px;align-items:baseline;font-size:11px"><span style="font-family:var(--fm);color:var(--text3);font-size:10px;flex-shrink:0">${(ev.timestamp||'').slice(11,19)}</span><span>${ev.event}</span>${ev.drone_id?`<span style="color:var(--g);font-family:var(--fm);font-size:10px">${ev.drone_id}</span>`:''}</div>`).join('');
+}
+function renderDrones(h) {
+  const dm = {};
+  h.forEach(ev => { if(ev.drone_id) { if(!dm[ev.drone_id]) dm[ev.drone_id]={id:ev.drone_id,evs:[]}; dm[ev.drone_id].evs.push(ev.event); } });
+  S.drones = Object.values(dm);
+  const el = document.getElementById('dlist');
+  if (!S.drones.length) { el.innerHTML='<div style="color:var(--text3);font-family:var(--fm);font-size:11px">Нет зарегистрированных дронов</div>'; return; }
+  el.innerHTML = S.drones.map(d=>`<div class="dr"><span class="did">${d.id}</span><span style="color:var(--text2);font-size:10px">${d.evs.includes('drone_registered')?'зарегистрирован':''}</span><span class="badge ${d.evs.includes('takeoff_authorized')?'ok':'off'}">${d.evs.includes('takeoff_authorized')?'В ПОЛЁТЕ':'НА ЗЕМЛЕ'}</span></div>`).join('');
+}
+function updMetrics(h) {
+  const ds = new Set(h.filter(e=>e.drone_id).map(e=>e.drone_id));
+  const fs = new Set(h.filter(e=>e.event==='takeoff_authorized').map(e=>e.mission_id));
+  document.getElementById('m-d').textContent = ds.size;
+  document.getElementById('m-ds').textContent = ds.size + ' уникальных';
+  document.getElementById('m-f').textContent = fs.size;
+  document.getElementById('m-fs').textContent = 'взлётов';
+}
+
+// ── MAP ────────────────────────────────────────────────
+let map, drawMode=false, dStart=null;
+const ZL = L.layerGroup ? null : null; // placeholder
+let zoneLayer, droneLayer, previewLayer, droneMarkers={};
+
+function initMap() {
+  map = L.map('zones-map').setView([55.751244,37.618423], 11);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution:'© OpenStreetMap © CartoDB', subdomains:'abcd', maxZoom:19 }).addTo(map);
+  zoneLayer   = L.layerGroup().addTo(map);
+  droneLayer  = L.layerGroup().addTo(map);
+  previewLayer= L.layerGroup().addTo(map);
+  map.on('mousedown', onMD);
+  map.on('mousemove', onMM);
+  map.on('mouseup',   onMU);
+  renderZones();
+}
+
+function toggleDraw() {
+  drawMode = !drawMode;
+  const btn = document.getElementById('bdraw');
+  const hint= document.getElementById('mhint');
+  if (drawMode) {
+    btn.className='btn a'; btn.textContent='✕ Отменить';
+    hint.textContent='Зажмите и тяните чтобы выделить зону';
+    map.dragging.disable();
+  } else {
+    btn.className='btn r'; btn.textContent='✎ Нарисовать зону';
+    hint.textContent='Нажмите «Нарисовать зону» и выделите прямоугольник';
+    map.dragging.enable(); previewLayer.clearLayers(); dStart=null;
+  }
+}
+
+let pRect=null;
+function onMD(e) { if(!drawMode) return; dStart=e.latlng; }
+function onMM(e) {
+  if(!drawMode||!dStart) return;
+  previewLayer.clearLayers();
+  pRect = L.rectangle(L.latLngBounds(dStart,e.latlng), {color:'#ff5252',weight:2,fillColor:'#ff5252',fillOpacity:.15,dashArray:'5 4'});
+  pRect.addTo(previewLayer);
+}
+function onMU(e) {
+  if(!drawMode||!dStart) return;
+  const end=e.latlng;
+  const minLat=Math.min(dStart.lat,end.lat), maxLat=Math.max(dStart.lat,end.lat);
+  const minLon=Math.min(dStart.lng,end.lng), maxLon=Math.max(dStart.lng,end.lng);
+  if(Math.abs(maxLat-minLat)<0.0001||Math.abs(maxLon-minLon)<0.0001){dStart=null;return;}
+  document.getElementById('mzmla').value=minLat.toFixed(6);
+  document.getElementById('mzmxa').value=maxLat.toFixed(6);
+  document.getElementById('mzmlo').value=minLon.toFixed(6);
+  document.getElementById('mzmxo').value=maxLon.toFixed(6);
+  document.getElementById('mzid').value='zone'+(S.zones.length+1);
+  document.getElementById('mznote').className='mnote';
+  openM('mz'); dStart=null;
+}
+function cancelDraw() {
+  previewLayer && previewLayer.clearLayers();
+  if(drawMode) toggleDraw();
+  closeM('mz');
+}
+async function confirmDraw() {
+  const n=document.getElementById('mznote');
+  const zid=v('mzid');
+  if(!zid){n.className='mnote show err';n.textContent='Введите Zone ID';return;}
+  const p={zone_id:zid,type:'no_fly',bounds:{min_lat:fl('mzmla'),max_lat:fl('mzmxa'),min_lon:fl('mzmlo'),max_lon:fl('mzmxo')},active:true};
+  n.className='mnote show load'; n.textContent='⏳ Отправка...';
+  try { const r=await api('add_no_fly_zone',p); n.className='mnote show ok'; n.textContent='✓ '+JSON.stringify(r); alog('ok','[ORVD]    ',`Зона ${zid} добавлена с карты`); }
+  catch(e) { n.className='mnote show err'; n.textContent='✕ API недоступен — зона сохранена локально'; alog('er','[ERROR]   ',e.message); }
+  addZoneLocal({zone_id:p.zone_id,bounds:p.bounds,active:true});
+  previewLayer && previewLayer.clearLayers();
+  if(drawMode) toggleDraw();
+  setTimeout(()=>closeM('mz'),800);
+}
+
+function addZoneLocal(z) {
+  const i=S.zones.findIndex(x=>x.zone_id===z.zone_id);
+  if(i>=0) S.zones[i]=z; else S.zones.push(z);
+  localStorage.setItem('zones',JSON.stringify(S.zones));
+  renderZones(); renderZTable();
+  document.getElementById('m-z').textContent=S.zones.filter(x=>x.active).length;
+  document.getElementById('m-zs').textContent='активных зон';
+}
+function rmZoneLocal(zid) {
+  S.zones=S.zones.filter(z=>z.zone_id!==zid);
+  localStorage.setItem('zones',JSON.stringify(S.zones));
+  renderZones(); renderZTable();
+  document.getElementById('m-z').textContent=S.zones.filter(x=>x.active).length;
+}
+
+function renderZones() {
+  if(!map||!zoneLayer) return;
+  zoneLayer.clearLayers();
+  S.zones.forEach(z=>{
+    const b=z.bounds; if(!b) return;
+    L.rectangle([[b.min_lat,b.min_lon],[b.max_lat,b.max_lon]],{color:'#ff5252',weight:2,fillColor:'#ff5252',fillOpacity:.18})
+     .bindPopup(`<div style="font-weight:700;color:#ff5252;margin-bottom:4px">${z.zone_id}</div><div style="font-size:11px;line-height:1.7;font-family:'JetBrains Mono',monospace">Lat: ${b.min_lat.toFixed(4)} – ${b.max_lat.toFixed(4)}<br>Lon: ${b.min_lon.toFixed(4)} – ${b.max_lon.toFixed(4)}<br><span style="color:${z.active?'#ff5252':'#555b65'}">● ${z.active?'АКТИВНА':'НЕАКТИВНА'}</span></div>`)
+     .addTo(zoneLayer);
+  });
+}
+
+function renderZTable() {
+  const tb=document.getElementById('ztbody');
+  if(!S.zones.length){tb.innerHTML='<tr><td colspan="7" style="color:var(--text3);font-family:var(--fu)">Нет зон — добавьте через форму или карту</td></tr>';return;}
+  tb.innerHTML=S.zones.map(z=>`<tr><td style="color:var(--r)">${z.zone_id}</td><td>${z.bounds?.min_lat?.toFixed(4)||'—'}</td><td>${z.bounds?.max_lat?.toFixed(4)||'—'}</td><td>${z.bounds?.min_lon?.toFixed(4)||'—'}</td><td>${z.bounds?.max_lon?.toFixed(4)||'—'}</td><td><span class="badge ${z.active?'err':'off'}">${z.active?'АКТИВНА':'НЕАКТ.'}</span></td><td><button class="zdel" onclick="rmZoneLocal('${z.zone_id}')">✕</button></td></tr>`).join('');
+}
+
+function fitAll() {
+  if(!map) return;
+  if(!S.zones.length){map.setView([55.751244,37.618423],11);return;}
+  const bds=S.zones.map(z=>[[z.bounds.min_lat,z.bounds.min_lon],[z.bounds.max_lat,z.bounds.max_lon]]).flat();
+  map.fitBounds(bds,{padding:[40,40]});
+}
+function fitMoscow(){map&&map.setView([55.751244,37.618423],12);}
+
+function previewForm() {
+  if(!map) return;
+  const b={min_lat:fl('zmla'),max_lat:fl('zmxa'),min_lon:fl('zmlo'),max_lon:fl('zmxo')};
+  previewLayer.clearLayers();
+  L.rectangle([[b.min_lat,b.min_lon],[b.max_lat,b.max_lon]],{color:'#ffb300',weight:2,fillColor:'#ffb300',fillOpacity:.2,dashArray:'5 4'}).addTo(previewLayer);
+  map.fitBounds([[b.min_lat,b.min_lon],[b.max_lat,b.max_lon]],{padding:[40,40]});
+}
+
+function updDroneMarker(id,lat,lon,alt) {
+  if(!map) return;
+  const icon=L.divIcon({html:`<div style="width:14px;height:14px;background:#00d084;border-radius:50%;border:2px solid #0a0c0f;box-shadow:0 0 8px #00d08480"></div>`,iconSize:[14,14],iconAnchor:[7,7],className:''});
+  if(droneMarkers[id]) { droneMarkers[id].setLatLng([lat,lon]).setPopupContent(`<b style="color:#00d084">${id}</b><br><span style="font-family:'JetBrains Mono',monospace;font-size:11px">${lat.toFixed(5)}, ${lon.toFixed(5)}<br>Alt: ${alt}m</span>`); }
+  else { droneMarkers[id]=L.marker([lat,lon],{icon}).bindPopup(`<b style="color:#00d084">${id}</b><br><span style="font-family:'JetBrains Mono',monospace;font-size:11px">${lat.toFixed(5)}, ${lon.toFixed(5)}<br>Alt: ${alt}m</span>`).addTo(droneLayer); }
+}
+
+setTimeout(initMap, 200);
+
+// ── LOG SIM ────────────────────────────────────────────
+const SIM=[
+  {c:'ok', s:'[ORVD]    ',m:'drone-0x4A2F зарегистрирован успешно'},
+  {c:'in', s:'[GATEWAY] ',m:'входящий запрос register_drone прошёл валидацию'},
+  {c:'ok', s:'[MONITOR] ',m:'ALLOW: gateway → orvd_component / register_drone (SG-01)'},
+  {c:'in', s:'[GATEWAY] ',m:'register_mission #101: маршрут получен, 2 точки'},
+  {c:'ok', s:'[ORVD]    ',m:'Миссия #101 зарегистрирована — маршрут свободен'},
+  {c:'ok', s:'[MONITOR] ',m:'ALLOW: orvd_component → journal/write (SG-05)'},
+  {c:'wa', s:'[ZONES]   ',m:'запретная зона KZN-07 обновлена из внешнего источника'},
+  {c:'ok', s:'[ORVD]    ',m:'authorize_mission #101 → authorized'},
+  {c:'ok', s:'[ORVD]    ',m:'request_takeoff: drone-0x4A2F — взлёт авторизован'},
+  {c:'in', s:'[JOURNAL] ',m:'flight_auth_success записан'},
+  {c:'wa', s:'[MONITOR] ',m:'DENY: telemetry → orvd_component прямой доступ (SG-04)'},
+  {c:'ok', s:'[BROKER]  ',m:'heartbeat OK, partition 0 lag=0'},
+  {c:'in', s:'[TELEMETRY]',m:'GPS: 55.7522°N 37.6156°E, alt=120m, speed=8.2m/s'},
+  {c:'wa', s:'[MONITOR] ',m:'DENY: external_api → orvd_component обход шлюза (SG-02)'},
+  {c:'ok', s:'[ORVD]    ',m:'drone-0x4A2F выполняет миссию #101'},
+  {c:'ok', s:'[JOURNAL] ',m:'32 события записано за текущую сессию'},
+];
+let simT=null, simI=0, simS=700;
+
+function ts(){return new Date().toLocaleTimeString('ru-RU');}
+function alog(c,s,m){
+  const stream=document.getElementById('logstream');
+  const d=document.createElement('div'); d.className='ll';
+  d.innerHTML=`<span class="lt">${ts()}</span><span class="lsrc ${c}">${s}</span><span class="lm">${m}</span>`;
+  stream.appendChild(d); stream.scrollTop=stream.scrollHeight;
+  if(!document.getElementById('page-log').classList.contains('active')) document.getElementById('lpip').style.display='block';
+}
+function startSim(){
+  if(simT)return; document.getElementById('bstart').disabled=true; document.getElementById('bstop').disabled=false;
+  simT=setInterval(()=>{alog(SIM[simI%SIM.length].c,SIM[simI%SIM.length].s,SIM[simI%SIM.length].m);simI++;},simS);
+}
+function stopSim(){clearInterval(simT);simT=null;document.getElementById('bstart').disabled=false;document.getElementById('bstop').disabled=true;}
+function clearLog(){stopSim();document.getElementById('logstream').innerHTML='';simI=0;}
+function updSpd(v){simS=parseInt(v);document.getElementById('spdl').textContent=(simS/1000).toFixed(1)+'с';if(simT){stopSim();startSim();}}
+
+// ── INIT ───────────────────────────────────────────────
+document.getElementById('m-z').textContent=S.zones.filter(z=>z.active).length;
+document.getElementById('m-zs').textContent=S.zones.length?'активных зон':'добавьте зону';
+if(localStorage.getItem('gw_url')){S.connected=true;setBadge(true);fetchH();}
+</script>
+</body>
+</html>
